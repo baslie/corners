@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useMemo } from 'react';
+import { useReducer, useCallback, useMemo, useEffect, useState, useRef } from 'react';
 import {
   createBoard,
   getCornerK,
@@ -6,19 +6,29 @@ import {
   getValidMoves,
   makeMove,
   checkWin,
-  getJumpPath,
 } from './game/logic';
+import { getBestMove } from './game/ai';
 
 // ===================== Reducer =====================
 
-const initialSettings = { rows: 8, cols: 8, cornerSize: 'medium' };
+const initialSettings = {
+  rows: 8,
+  cols: 8,
+  cornerSize: 'medium',
+  firstMove: 'player',
+  difficulty: 'medium',
+};
 
 function createInitialGameState(settings) {
   const { board, zones } = createBoard(settings.rows, settings.cols, settings.cornerSize);
+  let firstPlayer = 1;
+  if (settings.firstMove === 'computer') firstPlayer = 2;
+  else if (settings.firstMove === 'random') firstPlayer = Math.random() < 0.5 ? 1 : 2;
+
   return {
     board,
     zones,
-    currentPlayer: 1,
+    currentPlayer: firstPlayer,
     selectedPiece: null,
     validMoves: null,
     moveCount: { 1: 0, 2: 0 },
@@ -26,6 +36,8 @@ function createInitialGameState(settings) {
     settings,
   };
 }
+
+const AI_PLAYER = 2;
 
 function gameReducer(state, action) {
   switch (action.type) {
@@ -53,8 +65,26 @@ function gameReducer(state, action) {
         winner,
       };
     }
+    case 'MAKE_MOVE_AI': {
+      const { fromRow, fromCol, toRow, toCol } = action;
+      const { currentPlayer } = state;
+      const newBoard = makeMove(state.board, fromRow, fromCol, toRow, toCol);
+      const winner = checkWin(newBoard, state.zones);
+      const nextPlayer = currentPlayer === 1 ? 2 : 1;
+      return {
+        ...state,
+        board: newBoard,
+        currentPlayer: nextPlayer,
+        selectedPiece: null,
+        validMoves: null,
+        moveCount: { ...state.moveCount, [currentPlayer]: state.moveCount[currentPlayer] + 1 },
+        winner,
+      };
+    }
     case 'DESELECT':
       return { ...state, selectedPiece: null, validMoves: null };
+    case 'RESET':
+      return createInitialGameState(state.settings);
     default:
       return state;
   }
@@ -62,7 +92,7 @@ function gameReducer(state, action) {
 
 // ===================== Компоненты =====================
 
-function Cell({ row, col, value, isSelected, isStep, isJump, isP1Zone, isP2Zone, onClick }) {
+function Cell({ value, isSelected, isStep, isJump, isP1Zone, isP2Zone, onClick }) {
   let bg = '';
   if (isSelected) bg = 'ring-3 ring-yellow-400 ring-inset';
   if (isStep) bg += ' bg-green-400/40';
@@ -88,7 +118,7 @@ function Cell({ row, col, value, isSelected, isStep, isJump, isP1Zone, isP2Zone,
   );
 }
 
-function Board({ state, dispatch }) {
+function Board({ state, dispatch, isLocked }) {
   const { board, zones, selectedPiece, validMoves, currentPlayer } = state;
 
   const stepSet = useMemo(() => {
@@ -103,7 +133,7 @@ function Board({ state, dispatch }) {
 
   const handleClick = useCallback(
     (row, col) => {
-      if (state.winner) return;
+      if (state.winner || isLocked) return;
       const k = `${row},${col}`;
 
       if (selectedPiece && (stepSet.has(k) || jumpSet.has(k))) {
@@ -117,7 +147,7 @@ function Board({ state, dispatch }) {
         dispatch({ type: 'DESELECT' });
       }
     },
-    [board, currentPlayer, selectedPiece, stepSet, jumpSet, state.winner, dispatch],
+    [board, currentPlayer, selectedPiece, stepSet, jumpSet, state.winner, isLocked, dispatch],
   );
 
   return (
@@ -133,8 +163,6 @@ function Board({ state, dispatch }) {
           return (
             <Cell
               key={k}
-              row={ri}
-              col={ci}
               value={cell}
               isSelected={selectedPiece?.row === ri && selectedPiece?.col === ci}
               isStep={stepSet.has(k)}
@@ -150,7 +178,7 @@ function Board({ state, dispatch }) {
   );
 }
 
-function InfoPanel({ state }) {
+function InfoPanel({ state, isThinking }) {
   const { currentPlayer, moveCount, zones, board, settings } = state;
 
   const progress = useMemo(() => {
@@ -171,36 +199,68 @@ function InfoPanel({ state }) {
     };
   }, [board, zones]);
 
+  const isVsComputer = !!settings.difficulty;
+  const turnLabel = isVsComputer
+    ? (currentPlayer === AI_PLAYER ? 'Компьютер' : 'Вы')
+    : `Игрок ${currentPlayer}`;
+
+  const difficultyLabel = { easy: 'Лёгкий', medium: 'Средний', hard: 'Сложный' };
+
   return (
     <div className="flex flex-col gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 min-w-[220px]">
       <div className="text-center">
         <div className="text-sm text-gray-500 mb-1">Сейчас ходит</div>
         <div className="flex items-center justify-center gap-2 text-lg font-bold">
           <div className={`w-5 h-5 rounded-full ${currentPlayer === 1 ? 'bg-blue-500' : 'bg-red-500'}`} />
-          Игрок {currentPlayer}
+          {turnLabel}
         </div>
+        {isThinking && (
+          <div className="flex items-center justify-center gap-2 mt-2 text-sm text-gray-500">
+            <div className="flex gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+            думает...
+          </div>
+        )}
       </div>
 
       <div className="border-t border-gray-200 pt-3">
         <div className="text-sm text-gray-500 mb-2">Ходов сделано</div>
         <div className="flex justify-between">
           <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-blue-500 inline-block" /> {moveCount[1]}
+            <span className="w-3 h-3 rounded-full bg-blue-500 inline-block" />
+            {isVsComputer ? 'Вы' : 'Игрок 1'}: {moveCount[1]}
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-red-500 inline-block" /> {moveCount[2]}
+            <span className="w-3 h-3 rounded-full bg-red-500 inline-block" />
+            {isVsComputer ? 'ИИ' : 'Игрок 2'}: {moveCount[2]}
           </span>
         </div>
       </div>
 
       <div className="border-t border-gray-200 pt-3">
         <div className="text-sm text-gray-500 mb-2">Прогресс</div>
-        <ProgressBar label="Игрок 1" color="bg-blue-500" current={progress.p1.current} total={progress.p1.total} />
-        <ProgressBar label="Игрок 2" color="bg-red-500" current={progress.p2.current} total={progress.p2.total} />
+        <ProgressBar
+          label={isVsComputer ? 'Вы' : 'Игрок 1'}
+          color="bg-blue-500"
+          current={progress.p1.current}
+          total={progress.p1.total}
+        />
+        <ProgressBar
+          label={isVsComputer ? 'Компьютер' : 'Игрок 2'}
+          color="bg-red-500"
+          current={progress.p2.current}
+          total={progress.p2.total}
+        />
       </div>
 
-      <div className="border-t border-gray-200 pt-3 text-xs text-gray-400 text-center">
-        Поле {settings.rows}&times;{settings.cols} | Уголок: {settings.cornerSize === 'small' ? 'маленький' : settings.cornerSize === 'medium' ? 'средний' : 'большой'}
+      <div className="border-t border-gray-200 pt-3 text-xs text-gray-400 text-center space-y-0.5">
+        <div>Поле {settings.rows}&times;{settings.cols} | Уголок: {settings.cornerSize === 'small' ? 'маленький' : settings.cornerSize === 'medium' ? 'средний' : 'большой'}</div>
+        {isVsComputer && (
+          <div>Сложность: {difficultyLabel[settings.difficulty]}</div>
+        )}
       </div>
     </div>
   );
@@ -221,14 +281,23 @@ function ProgressBar({ label, color, current, total }) {
   );
 }
 
-function GameOver({ winner, moveCount, onRematch, onMenu }) {
+function GameOver({ winner, moveCount, onRematch, onMenu, isVsComputer }) {
+  let title;
+  if (isVsComputer) {
+    title = winner === 1 ? 'Вы победили!' : 'Компьютер победил!';
+  } else {
+    title = `Игрок ${winner} победил!`;
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
-        <div className="text-4xl mb-4">{winner === 1 ? '🔵' : '🔴'}</div>
-        <h2 className="text-2xl font-bold mb-2">Игрок {winner} победил!</h2>
+        <div className="text-4xl mb-4">{winner === 1 ? '🎉' : '🤖'}</div>
+        <h2 className="text-2xl font-bold mb-2">{title}</h2>
         <div className="text-gray-500 mb-6">
-          Ходов: Игрок 1 — {moveCount[1]}, Игрок 2 — {moveCount[2]}
+          {isVsComputer
+            ? `Ходов: Вы — ${moveCount[1]}, Компьютер — ${moveCount[2]}`
+            : `Ходов: Игрок 1 — ${moveCount[1]}, Игрок 2 — ${moveCount[2]}`}
         </div>
         <div className="flex gap-3 justify-center">
           <button
@@ -251,15 +320,51 @@ function GameOver({ winner, moveCount, onRematch, onMenu }) {
 
 function Game({ settings, onMenu }) {
   const [state, dispatch] = useReducer(gameReducer, settings, createInitialGameState);
+  const [isThinking, setIsThinking] = useState(false);
+  const aiRunning = useRef(false);
+
+  const isVsComputer = !!settings.difficulty;
+
+  // Автоматический ход компьютера
+  useEffect(() => {
+    if (!isVsComputer || state.winner || state.currentPlayer !== AI_PLAYER) {
+      return;
+    }
+
+    if (aiRunning.current) return;
+    aiRunning.current = true;
+    setIsThinking(true);
+
+    // Пауза для естественности, затем вычисление хода
+    const timer = setTimeout(() => {
+      const move = getBestMove(state.board, state.zones, AI_PLAYER, settings.difficulty);
+      if (move) {
+        dispatch({
+          type: 'MAKE_MOVE_AI',
+          fromRow: move.fromRow,
+          fromCol: move.fromCol,
+          toRow: move.toRow,
+          toCol: move.toCol,
+        });
+      }
+      setIsThinking(false);
+      aiRunning.current = false;
+    }, 600);
+
+    return () => {
+      clearTimeout(timer);
+      setIsThinking(false);
+      aiRunning.current = false;
+    };
+  }, [state.currentPlayer, state.winner, state.board, isVsComputer, settings.difficulty]);
 
   const handleRematch = useCallback(() => {
     dispatch({ type: 'RESET' });
+    setIsThinking(false);
+    aiRunning.current = false;
   }, []);
 
-  // Для реванша: пересоздаём стейт
-  const rematchReducer = useCallback(() => {
-    return createInitialGameState(settings);
-  }, [settings]);
+  const isPlayerTurnBlocked = isVsComputer && state.currentPlayer === AI_PLAYER;
 
   return (
     <div className="min-h-screen bg-gray-100 p-4">
@@ -275,9 +380,9 @@ function Game({ settings, onMenu }) {
         </div>
         <div className="flex flex-col lg:flex-row gap-4 items-start justify-center">
           <div className="w-full max-w-[min(70vh,600px)]">
-            <Board state={state} dispatch={dispatch} />
+            <Board state={state} dispatch={dispatch} isLocked={isPlayerTurnBlocked} />
           </div>
-          <InfoPanel state={state} />
+          <InfoPanel state={state} isThinking={isThinking} />
         </div>
       </div>
 
@@ -285,8 +390,9 @@ function Game({ settings, onMenu }) {
         <GameOver
           winner={state.winner}
           moveCount={state.moveCount}
-          onRematch={() => window.location.reload()}
+          onRematch={handleRematch}
           onMenu={onMenu}
+          isVsComputer={isVsComputer}
         />
       )}
     </div>
@@ -327,6 +433,18 @@ function BoardPreview({ rows, cols, cornerSize }) {
 
 const CORNER_LABELS = { small: 'Маленький (6)', medium: 'Средний (10)', large: 'Большой (15)' };
 const CORNER_SIZES = ['small', 'medium', 'large'];
+
+const FIRST_MOVE_OPTIONS = [
+  { value: 'player', label: 'Игрок' },
+  { value: 'computer', label: 'Компьютер' },
+  { value: 'random', label: 'Случайно' },
+];
+
+const DIFFICULTY_OPTIONS = [
+  { value: 'easy', label: 'Лёгкий' },
+  { value: 'medium', label: 'Средний' },
+  { value: 'hard', label: 'Сложный' },
+];
 
 function Lobby({ onStart }) {
   const [settings, setSettings] = useReducer(
@@ -404,6 +522,38 @@ function Lobby({ onStart }) {
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">Кто ходит первым</label>
+            <div className="flex gap-2">
+              {FIRST_MOVE_OPTIONS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setSettings({ firstMove: value })}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors cursor-pointer
+                    ${settings.firstMove === value ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">Сложность ИИ</label>
+            <div className="flex gap-2">
+              {DIFFICULTY_OPTIONS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setSettings({ difficulty: value })}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors cursor-pointer
+                    ${settings.difficulty === value ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
 
