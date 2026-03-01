@@ -643,8 +643,8 @@ function BoardPreview({ rows, cols, cornerSize }) {
     >
       {Array.from({ length: rows }, (_, r) =>
         Array.from({ length: cols }, (_, c) => {
-          const isP1 = r + c < K;
-          const isP2 = r + c >= rows + cols - K - 1;
+          const isP1 = r < K && c < K;
+          const isP2 = r >= rows - K && c >= cols - K;
           return (
             <div
               key={`${r},${c}`}
@@ -659,7 +659,7 @@ function BoardPreview({ rows, cols, cornerSize }) {
 
 // ===================== Лобби =====================
 
-const CORNER_LABELS = { small: 'Маленький (6)', medium: 'Средний (10)', large: 'Большой (15)' };
+const CORNER_LABELS = { small: 'Маленький (9)', medium: 'Средний (16)', large: 'Большой (25)' };
 const CORNER_SIZES = ['small', 'medium', 'large'];
 
 const FIRST_MOVE_OPTIONS = [

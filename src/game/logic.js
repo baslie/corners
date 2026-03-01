@@ -3,9 +3,9 @@
 const CORNER_K = { small: 3, medium: 4, large: 5 };
 
 const DIRECTIONS = [
-  [-1, -1], [-1, 0], [-1, 1],
-  [0, -1],           [0, 1],
-  [1, -1],  [1, 0],  [1, 1],
+          [-1, 0],
+  [0, -1],         [0, 1],
+          [1, 0],
 ];
 
 // === Вспомогательные функции ===
@@ -17,13 +17,13 @@ export function getCornerK(cornerSize) {
 export function getMaxCornerSize(rows, cols) {
   const area = rows * cols;
   const maxPieces = Math.floor(area * 0.3);
-  if (triangleCount(5) <= maxPieces) return 'large';
-  if (triangleCount(4) <= maxPieces) return 'medium';
+  if (squareCount(5) <= maxPieces) return 'large';
+  if (squareCount(4) <= maxPieces) return 'medium';
   return 'small';
 }
 
-function triangleCount(k) {
-  return (k * (k + 1)) / 2;
+function squareCount(k) {
+  return k * k;
 }
 
 function inBounds(row, col, rows, cols) {
@@ -44,11 +44,11 @@ export function createBoard(rows, cols, cornerSize) {
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      if (r + c < K) {
+      if (r < K && c < K) {
         player1Zone.add(key(r, c));
         board[r][c] = 1;
       }
-      if (r + c >= rows + cols - K - 1) {
+      if (r >= rows - K && c >= cols - K) {
         player2Zone.add(key(r, c));
         board[r][c] = 2;
       }
@@ -73,7 +73,7 @@ export function getValidMoves(board, row, col, zones, currentPlayer) {
   const finishZone = currentPlayer === 1 ? zones.player2 : zones.player1;
   const pieceInFinish = finishZone.has(key(row, col));
 
-  // Шаги — 8 соседних клеток
+  // Шаги — 4 соседних клетки
   for (const [dr, dc] of DIRECTIONS) {
     const nr = row + dr;
     const nc = col + dc;
