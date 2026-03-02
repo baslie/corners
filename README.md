@@ -1,16 +1,35 @@
-# React + Vite
+# Уголки (Corners / Halma)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Браузерная настольная игра «Уголки» с режимом «Игрок vs Компьютер».
 
-Currently, two official plugins are available:
+## Об игре
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Цель — первым переместить все свои фишки из своего угла доски в противоположный. Фишки двигаются шагом на соседнюю клетку или прыжком через другие фишки — прыжки можно объединять в цепочки за один ход.
 
-## React Compiler
+## Возможности
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Настраиваемое поле от 8×8 до 16×16
+- Три размера стартовой зоны (маленький, средний, большой)
+- Три уровня сложности ИИ (жадный алгоритм, Minimax с альфа-бета отсечением)
+- Подсветка допустимых ходов и пути цепочки прыжков
+- Анимация перемещения фишек
+- Отмена хода, сдача партии
+- Таймер и статистика по итогам игры
+- Адаптивная вёрстка для десктопа и мобильных
 
-## Expanding the ESLint configuration
+## Стек
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- React 19
+- Tailwind CSS 4
+- Vite 7
+
+## Запуск
+
+```bash
+npm install
+npm run dev
+```
+
+## Лицензия
+
+MIT
