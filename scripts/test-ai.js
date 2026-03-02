@@ -49,27 +49,18 @@ function parseArgs() {
 // ======================== Тестовая матрица ========================
 
 const TEST_MATRIX = [
-  // 8×8
-  { rows: 8, cols: 8, cornerSize: 'small', difficulty: 'easy',   defaultGames: 5, label: '8x8 K=small easy' },
-  { rows: 8, cols: 8, cornerSize: 'small', difficulty: 'medium', defaultGames: 5, label: '8x8 K=small medium' },
-  { rows: 8, cols: 8, cornerSize: 'small', difficulty: 'hard',   defaultGames: 3, label: '8x8 K=small hard' },
-  { rows: 8, cols: 8, cornerSize: 'medium', difficulty: 'easy',   defaultGames: 5, label: '8x8 K=medium easy' },
-  { rows: 8, cols: 8, cornerSize: 'medium', difficulty: 'medium', defaultGames: 5, label: '8x8 K=medium medium' },
-  { rows: 8, cols: 8, cornerSize: 'medium', difficulty: 'hard',   defaultGames: 3, label: '8x8 K=medium hard' },
-  // 10×10
-  { rows: 10, cols: 10, cornerSize: 'small', difficulty: 'easy',   defaultGames: 3, label: '10x10 K=small easy' },
-  { rows: 10, cols: 10, cornerSize: 'small', difficulty: 'medium', defaultGames: 3, label: '10x10 K=small medium' },
-  { rows: 10, cols: 10, cornerSize: 'small', difficulty: 'hard',   defaultGames: 2, label: '10x10 K=small hard' },
-  { rows: 10, cols: 10, cornerSize: 'medium', difficulty: 'easy',   defaultGames: 3, label: '10x10 K=medium easy' },
-  { rows: 10, cols: 10, cornerSize: 'medium', difficulty: 'medium', defaultGames: 3, label: '10x10 K=medium medium' },
-  { rows: 10, cols: 10, cornerSize: 'medium', difficulty: 'hard',   defaultGames: 2, label: '10x10 K=medium hard' },
-  // 12×12
-  { rows: 12, cols: 12, cornerSize: 'small', difficulty: 'easy',   defaultGames: 3, label: '12x12 K=small easy' },
-  { rows: 12, cols: 12, cornerSize: 'small', difficulty: 'medium', defaultGames: 2, label: '12x12 K=small medium' },
-  { rows: 12, cols: 12, cornerSize: 'small', difficulty: 'hard',   defaultGames: 1, label: '12x12 K=small hard' },
-  { rows: 12, cols: 12, cornerSize: 'medium', difficulty: 'easy',   defaultGames: 3, label: '12x12 K=medium easy' },
-  { rows: 12, cols: 12, cornerSize: 'medium', difficulty: 'medium', defaultGames: 2, label: '12x12 K=medium medium' },
-  { rows: 12, cols: 12, cornerSize: 'medium', difficulty: 'hard',   defaultGames: 1, label: '12x12 K=medium hard' },
+  // 8×8 (small corner, K=3)
+  { rows: 8,  cols: 8,  cornerSize: 'small',  difficulty: 'easy',   defaultGames: 5, label: '8x8 easy' },
+  { rows: 8,  cols: 8,  cornerSize: 'small',  difficulty: 'medium', defaultGames: 5, label: '8x8 medium' },
+  { rows: 8,  cols: 8,  cornerSize: 'small',  difficulty: 'hard',   defaultGames: 3, label: '8x8 hard' },
+  // 12×12 (medium corner, K=4)
+  { rows: 12, cols: 12, cornerSize: 'medium', difficulty: 'easy',   defaultGames: 3, label: '12x12 easy' },
+  { rows: 12, cols: 12, cornerSize: 'medium', difficulty: 'medium', defaultGames: 2, label: '12x12 medium' },
+  { rows: 12, cols: 12, cornerSize: 'medium', difficulty: 'hard',   defaultGames: 1, label: '12x12 hard' },
+  // 16×16 (large corner, K=5)
+  { rows: 16, cols: 16, cornerSize: 'large',  difficulty: 'easy',   defaultGames: 2, label: '16x16 easy' },
+  { rows: 16, cols: 16, cornerSize: 'large',  difficulty: 'medium', defaultGames: 1, label: '16x16 medium' },
+  { rows: 16, cols: 16, cornerSize: 'large',  difficulty: 'hard',   defaultGames: 1, label: '16x16 hard' },
 ];
 
 // ======================== Одна партия ========================
@@ -96,16 +87,16 @@ function runGame(config, maxMoves, verbose) {
     winner = checkWin(board, zones);
     if (winner) break;
 
-    // Собираем recentHashes — точная копия логики из App.jsx (строки 526-535)
-    const recentHashes = new Set();
-    const histLen = history.length;
-    for (let i = Math.max(0, histLen - 12); i < histLen; i++) {
-      recentHashes.add(history[i]);
+    // Собираем частоту позиций из всей истории для антиповтора
+    const positionFrequency = new Map();
+    for (const h of history) {
+      positionFrequency.set(h, (positionFrequency.get(h) || 0) + 1);
     }
-    recentHashes.add(hashBoard(board));
+    const currentHash = hashBoard(board);
+    positionFrequency.set(currentHash, (positionFrequency.get(currentHash) || 0) + 1);
 
     // Ход ИИ
-    const move = getBestMove(board, zones, currentPlayer, difficulty, recentHashes, moveCount[currentPlayer]);
+    const move = getBestMove(board, zones, currentPlayer, difficulty, positionFrequency, moveCount[currentPlayer]);
 
     if (!move) {
       // Нет доступных ходов — stuck

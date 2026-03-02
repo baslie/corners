@@ -2,7 +2,6 @@ import { useReducer, useCallback, useMemo, useEffect, useState, useRef } from 'r
 import {
   createBoard,
   getCornerK,
-  getMaxCornerSize,
   getValidMoves,
   getJumpPath,
   makeMove,
@@ -10,13 +9,21 @@ import {
 } from './game/logic';
 import { getBestMove, hashBoard } from './game/ai';
 
+// ===================== Пресеты доски =====================
+
+const BOARD_PRESETS = [
+  { key: 'small',  label: '8×8',   description: '9 фишек',  rows: 8,  cols: 8,  cornerSize: 'small'  },
+  { key: 'medium', label: '12×12', description: '16 фишек', rows: 12, cols: 12, cornerSize: 'medium' },
+  { key: 'large',  label: '16×16', description: '25 фишек', rows: 16, cols: 16, cornerSize: 'large'  },
+];
+
 // ===================== Reducer =====================
 
 const initialSettings = {
   rows: 8,
   cols: 8,
-  cornerSize: 'medium',
-  firstMove: 'player',
+  cornerSize: 'small',
+  firstMove: 'random',
   difficulty: 'medium',
 };
 
@@ -40,7 +47,7 @@ function createInitialGameState(settings) {
   };
 }
 
-const AI_PLAYER = 2;
+const AI_PLAYER = 1;
 
 function gameReducer(state, action) {
   switch (action.type) {
@@ -349,11 +356,11 @@ function InfoPanel({ state, isThinking, elapsed }) {
         <div className="flex justify-between">
           <span className="flex items-center gap-1">
             <span className="w-3 h-3 rounded-full bg-blue-500 inline-block" />
-            {isVsComputer ? 'Вы' : 'Игрок 1'}: {moveCount[1]}
+            {isVsComputer ? 'ИИ' : 'Игрок 1'}: {moveCount[1]}
           </span>
           <span className="flex items-center gap-1">
             <span className="w-3 h-3 rounded-full bg-red-500 inline-block" />
-            {isVsComputer ? 'ИИ' : 'Игрок 2'}: {moveCount[2]}
+            {isVsComputer ? 'Вы' : 'Игрок 2'}: {moveCount[2]}
           </span>
         </div>
       </div>
@@ -361,13 +368,13 @@ function InfoPanel({ state, isThinking, elapsed }) {
       <div className="border-t border-gray-200 pt-3">
         <div className="text-sm text-gray-500 mb-2">Прогресс</div>
         <ProgressBar
-          label={isVsComputer ? 'Вы' : 'Игрок 1'}
+          label={isVsComputer ? 'Компьютер' : 'Игрок 1'}
           color="bg-blue-500"
           current={progress.p1.current}
           total={progress.p1.total}
         />
         <ProgressBar
-          label={isVsComputer ? 'Компьютер' : 'Игрок 2'}
+          label={isVsComputer ? 'Вы' : 'Игрок 2'}
           color="bg-red-500"
           current={progress.p2.current}
           total={progress.p2.total}
@@ -380,7 +387,7 @@ function InfoPanel({ state, isThinking, elapsed }) {
       </div>
 
       <div className="border-t border-gray-200 pt-3 text-xs text-gray-400 text-center space-y-0.5">
-        <div>Поле {settings.rows}&times;{settings.cols} | Уголок: {settings.cornerSize === 'small' ? 'маленький' : settings.cornerSize === 'medium' ? 'средний' : 'большой'}</div>
+        <div>Поле {settings.rows}&times;{settings.cols}</div>
         {isVsComputer && (
           <div>Сложность: {difficultyLabel[settings.difficulty]}</div>
         )}
@@ -407,7 +414,7 @@ function ProgressBar({ label, color, current, total }) {
 function GameOver({ winner, moveCount, onRematch, onMenu, isVsComputer, elapsed }) {
   let title;
   if (isVsComputer) {
-    title = winner === 1 ? 'Вы победили!' : 'Компьютер победил!';
+    title = winner === AI_PLAYER ? 'Компьютер победил!' : 'Вы победили!';
   } else {
     title = `Игрок ${winner} победил!`;
   }
@@ -415,11 +422,11 @@ function GameOver({ winner, moveCount, onRematch, onMenu, isVsComputer, elapsed 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 game-over-backdrop">
       <div className="bg-white rounded-xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center game-over-modal">
-        <div className="text-4xl mb-4">{winner === 1 ? '🎉' : '🤖'}</div>
+        <div className="text-4xl mb-4">{winner === AI_PLAYER ? '🤖' : '🎉'}</div>
         <h2 className="text-2xl font-bold mb-2">{title}</h2>
         <div className="text-gray-500 mb-2">
           {isVsComputer
-            ? `Ходов: Вы — ${moveCount[1]}, Компьютер — ${moveCount[2]}`
+            ? `Ходов: Вы — ${moveCount[2]}, Компьютер — ${moveCount[1]}`
             : `Ходов: Игрок 1 — ${moveCount[1]}, Игрок 2 — ${moveCount[2]}`}
         </div>
         <div className="text-gray-400 text-sm mb-6">
@@ -522,17 +529,18 @@ function Game({ settings, onMenu }) {
     setIsThinking(true);
 
     const timer = setTimeout(() => {
-      // Собираем хеши последних позиций для антиповтора
-      const recentHashes = new Set();
-      const histLen = state.history.length;
-      for (let i = Math.max(0, histLen - 12); i < histLen; i++) {
-        recentHashes.add(hashBoard(state.history[i].board));
+      // Собираем частоту позиций из всей истории для антиповтора
+      const positionFrequency = new Map();
+      for (const entry of state.history) {
+        const h = hashBoard(entry.board);
+        positionFrequency.set(h, (positionFrequency.get(h) || 0) + 1);
       }
-      recentHashes.add(hashBoard(state.board));
+      const currentHash = hashBoard(state.board);
+      positionFrequency.set(currentHash, (positionFrequency.get(currentHash) || 0) + 1);
 
       const move = getBestMove(
         state.board, state.zones, AI_PLAYER, settings.difficulty,
-        recentHashes, state.moveCount[AI_PLAYER]
+        positionFrequency, state.moveCount[AI_PLAYER]
       );
       if (move) {
         // Compute animation path for AI move
@@ -670,15 +678,6 @@ function BoardPreview({ rows, cols, cornerSize }) {
 
 // ===================== Лобби =====================
 
-const CORNER_LABELS = { small: 'Маленький (9)', medium: 'Средний (16)', large: 'Большой (25)' };
-const CORNER_SIZES = ['small', 'medium', 'large'];
-
-const FIRST_MOVE_OPTIONS = [
-  { value: 'player', label: 'Игрок' },
-  { value: 'computer', label: 'Компьютер' },
-  { value: 'random', label: 'Случайно' },
-];
-
 const DIFFICULTY_OPTIONS = [
   { value: 'easy', label: 'Лёгкий' },
   { value: 'medium', label: 'Средний' },
@@ -691,92 +690,34 @@ function Lobby({ onStart }) {
     initialSettings,
   );
 
-  const maxCorner = useMemo(() => getMaxCornerSize(settings.rows, settings.cols), [settings.rows, settings.cols]);
-
-  const availableSizes = useMemo(() => {
-    const maxIdx = CORNER_SIZES.indexOf(maxCorner);
-    return CORNER_SIZES.slice(0, maxIdx + 1);
-  }, [maxCorner]);
-
-  const effectiveCorner = useMemo(() => {
-    if (availableSizes.includes(settings.cornerSize)) return settings.cornerSize;
-    return availableSizes[availableSizes.length - 1];
-  }, [availableSizes, settings.cornerSize]);
+  const activePreset = BOARD_PRESETS.find((p) => p.rows === settings.rows) || BOARD_PRESETS[0];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-red-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-red-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
         <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-blue-600 to-red-500 bg-clip-text text-transparent">Уголки</h1>
-        <p className="text-center text-gray-500 text-sm mb-6">
+        <p className="text-center text-gray-500 text-sm mb-4">
           Переместите все фишки в противоположный угол раньше соперника
         </p>
 
-        <div className="space-y-5">
+        <div className="space-y-4">
           <div>
-            <label className="flex justify-between text-sm font-medium text-gray-700 mb-1">
-              <span>Ширина поля</span>
-              <span className="text-gray-400">{settings.cols}</span>
-            </label>
-            <input
-              type="range"
-              min={8}
-              max={16}
-              value={settings.cols}
-              onChange={(e) => setSettings({ cols: +e.target.value })}
-              className="w-full accent-blue-600"
-            />
-          </div>
-
-          <div>
-            <label className="flex justify-between text-sm font-medium text-gray-700 mb-1">
-              <span>Высота поля</span>
-              <span className="text-gray-400">{settings.rows}</span>
-            </label>
-            <input
-              type="range"
-              min={8}
-              max={16}
-              value={settings.rows}
-              onChange={(e) => setSettings({ rows: +e.target.value })}
-              className="w-full accent-blue-600"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">Размер уголка</label>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">Размер доски</label>
             <div className="flex gap-2">
-              {CORNER_SIZES.map((size) => {
-                const disabled = !availableSizes.includes(size);
-                const active = effectiveCorner === size;
+              {BOARD_PRESETS.map((preset) => {
+                const active = activePreset.key === preset.key;
                 return (
                   <button
-                    key={size}
-                    disabled={disabled}
-                    onClick={() => !disabled && setSettings({ cornerSize: size })}
+                    key={preset.key}
+                    onClick={() => setSettings({ rows: preset.rows, cols: preset.cols, cornerSize: preset.cornerSize })}
                     className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors cursor-pointer
-                      ${active ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}
-                      ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      ${active ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
                   >
-                    {CORNER_LABELS[size]}
+                    <div>{preset.label}</div>
+                    <div className={`text-xs ${active ? 'text-blue-200' : 'text-gray-400'}`}>{preset.description}</div>
                   </button>
                 );
               })}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">Кто ходит первым</label>
-            <div className="flex gap-2">
-              {FIRST_MOVE_OPTIONS.map(({ value, label }) => (
-                <button
-                  key={value}
-                  onClick={() => setSettings({ firstMove: value })}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors cursor-pointer
-                    ${settings.firstMove === value ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                >
-                  {label}
-                </button>
-              ))}
             </div>
           </div>
 
@@ -797,11 +738,11 @@ function Lobby({ onStart }) {
           </div>
 
           <div className="flex justify-center py-3">
-            <BoardPreview rows={settings.rows} cols={settings.cols} cornerSize={effectiveCorner} />
+            <BoardPreview rows={settings.rows} cols={settings.cols} cornerSize={settings.cornerSize} />
           </div>
 
           <button
-            onClick={() => onStart({ ...settings, cornerSize: effectiveCorner })}
+            onClick={() => onStart(settings)}
             className="w-full py-3 bg-blue-600 text-white rounded-xl text-lg font-semibold hover:bg-blue-700 transition-all duration-150 active:scale-95 cursor-pointer"
           >
             Начать игру

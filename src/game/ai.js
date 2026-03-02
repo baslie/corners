@@ -245,9 +245,19 @@ function minimax(board, zones, depth, alpha, beta, maximizing, aiPlayer, difficu
   }
 }
 
+// === Эскалирующий штраф за повтор позиции ===
+
+function getRepeatPenalty(hash, positionFrequency) {
+  const count = positionFrequency.get(hash) || 0;
+  if (count === 0) return 0;
+  if (count === 1) return -500;
+  if (count === 2) return -5000;
+  return -100000; // count >= 3: запрет — эквивалент проигрыша
+}
+
 // === Главная функция ИИ ===
 
-export function getBestMove(board, zones, aiPlayer, difficulty, recentHashes = new Set(), aiMoveCount = 0) {
+export function getBestMove(board, zones, aiPlayer, difficulty, positionFrequency = new Map(), aiMoveCount = 0) {
   const rows = board.length;
   const cols = board[0].length;
   const isLargeBoard = Math.max(rows, cols) >= 12;
@@ -265,7 +275,7 @@ export function getBestMove(board, zones, aiPlayer, difficulty, recentHashes = n
     for (const move of moves) {
       const newBoard = makeMove(board, move.fromRow, move.fromCol, move.toRow, move.toCol);
       const h = hashBoard(newBoard);
-      const repeatPenalty = recentHashes.has(h) ? -500 : 0;
+      const repeatPenalty = getRepeatPenalty(h, positionFrequency);
       const score = evaluate(newBoard, zones, aiPlayer, difficulty, aiMoveCount) + repeatPenalty + (Math.random() * 10 - 5);
       if (score > bestScore) {
         bestScore = score;
@@ -297,9 +307,9 @@ export function getBestMove(board, zones, aiPlayer, difficulty, recentHashes = n
     const newBoard = makeMove(board, move.fromRow, move.fromCol, move.toRow, move.toCol);
     const result = minimax(newBoard, zones, depth - 1, -Infinity, Infinity, false, aiPlayer, difficulty, deadline, aiMoveCount);
 
-    // Штраф за повторение недавних позиций
+    // Штраф за повторение позиций
     const h = hashBoard(newBoard);
-    const repeatPenalty = recentHashes.has(h) ? -500 : 0;
+    const repeatPenalty = getRepeatPenalty(h, positionFrequency);
     const score = result.score + repeatPenalty;
 
     if (score > bestScore) {
