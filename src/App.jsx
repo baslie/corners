@@ -8,7 +8,7 @@ import {
   makeMove,
   checkWin,
 } from './game/logic';
-import { getBestMove } from './game/ai';
+import { getBestMove, hashBoard } from './game/ai';
 
 // ===================== Reducer =====================
 
@@ -522,7 +522,18 @@ function Game({ settings, onMenu }) {
     setIsThinking(true);
 
     const timer = setTimeout(() => {
-      const move = getBestMove(state.board, state.zones, AI_PLAYER, settings.difficulty);
+      // Собираем хеши последних позиций для антиповтора
+      const recentHashes = new Set();
+      const histLen = state.history.length;
+      for (let i = Math.max(0, histLen - 12); i < histLen; i++) {
+        recentHashes.add(hashBoard(state.history[i].board));
+      }
+      recentHashes.add(hashBoard(state.board));
+
+      const move = getBestMove(
+        state.board, state.zones, AI_PLAYER, settings.difficulty,
+        recentHashes, state.moveCount[AI_PLAYER]
+      );
       if (move) {
         // Compute animation path for AI move
         const aiValidMoves = getValidMoves(state.board, move.fromRow, move.fromCol, state.zones, AI_PLAYER);

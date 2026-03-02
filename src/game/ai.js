@@ -1,4 +1,4 @@
-import { getValidMoves, makeMove, checkWin } from './logic';
+import { getValidMoves, makeMove, checkWin } from './logic.js';
 
 // === Генерация всех ходов для игрока ===
 
@@ -24,7 +24,7 @@ function getAllMoves(board, zones, player) {
 
 // === Оценочная функция ===
 
-function evaluate(board, zones, aiPlayer, difficulty) {
+function evaluate(board, zones, aiPlayer, difficulty, aiMoveCount = 0) {
   const rows = board.length;
   const cols = board[0].length;
   const opponent = aiPlayer === 1 ? 2 : 1;
@@ -63,8 +63,21 @@ function evaluate(board, zones, aiPlayer, difficulty) {
 
   let score = 0;
 
-  // Чем меньше расстояние ИИ до цели — тем лучше
-  score -= aiDist * 3;
+  // Нарастающее давление после 20 ходов
+  const urgency = 1.0 + Math.max(0, aiMoveCount - 20) * 0.03;
+
+  // Чем меньше расстояние ИИ до цели — тем лучше (с urgency)
+  score -= aiDist * 3 * urgency;
+
+  // Штраф за самую далёкую фишку
+  let maxPieceDist = 0;
+  for (const [pr, pc] of aiPieces) {
+    const dist = aiPlayer === 1
+      ? (rows - 1 - pr) + (cols - 1 - pc)
+      : pr + pc;
+    maxPieceDist = Math.max(maxPieceDist, dist);
+  }
+  score -= maxPieceDist * 8;
 
   // Бонус за фишки в зоне финиша
   score += aiInFinish * 30;
@@ -73,16 +86,23 @@ function evaluate(board, zones, aiPlayer, difficulty) {
   if (aiInFinish === aiFinish.size) score += 100000;
   if (oppInFinish === oppFinish.size) score -= 100000;
 
-  // Кластеризация: бонус за компактное расположение (для цепочек прыжков)
-  if (aiPieces.length > 1) {
+  // Кластеризация: бонус только для продвинувшихся фишек (прошли >40% пути)
+  const maxDist = rows - 1 + cols - 1;
+  const advancedPieces = aiPieces.filter(([pr, pc]) => {
+    const dist = aiPlayer === 1
+      ? (rows - 1 - pr) + (cols - 1 - pc)
+      : pr + pc;
+    return dist < maxDist * 0.6;
+  });
+  if (advancedPieces.length > 1) {
     let clusterScore = 0;
-    for (let i = 0; i < aiPieces.length; i++) {
-      for (let j = i + 1; j < aiPieces.length; j++) {
+    for (let i = 0; i < advancedPieces.length; i++) {
+      for (let j = i + 1; j < advancedPieces.length; j++) {
         const d = Math.max(
-          Math.abs(aiPieces[i][0] - aiPieces[j][0]),
-          Math.abs(aiPieces[i][1] - aiPieces[j][1]),
+          Math.abs(advancedPieces[i][0] - advancedPieces[j][0]),
+          Math.abs(advancedPieces[i][1] - advancedPieces[j][1]),
         );
-        if (d <= 2) clusterScore += 3 - d; // бонус за близкие фишки
+        if (d <= 2) clusterScore += 3 - d;
       }
     }
     score += clusterScore;
@@ -108,14 +128,23 @@ function evaluate(board, zones, aiPlayer, difficulty) {
     score -= oppInFinish * 10;
   }
 
-  // Штраф за «застрявшие» фишки: далеко от цели и далеко от остальных
+  // Квадратичный штраф за отстающие фишки (далеко от среднего)
+  const avgDist = aiPieces.length > 0 ? aiDist / aiPieces.length : 0;
   for (const [pr, pc] of aiPieces) {
-    const distToTarget = aiPlayer === 1
+    const dist = aiPlayer === 1
       ? (rows - 1 - pr) + (cols - 1 - pc)
       : pr + pc;
-    if (distToTarget > rows + cols - 4) {
-      // Фишка очень далеко от цели — штраф
-      score -= 5;
+    const excess = dist - avgDist;
+    if (excess > 0) {
+      score -= excess * excess * 0.5;
+    }
+  }
+
+  // Штраф за фишки, оставшиеся в стартовой зоне
+  const aiStart = aiPlayer === 1 ? zones.player1 : zones.player2;
+  for (const [pr, pc] of aiPieces) {
+    if (aiStart.has(`${pr},${pc}`)) {
+      score -= 20;
     }
   }
 
@@ -158,22 +187,28 @@ function sortMoves(moves, board, zones, player) {
   });
 }
 
+// === Хеширование доски для антиповтора ===
+
+export function hashBoard(board) {
+  return board.map(row => row.map(c => c === null ? '0' : String(c)).join('')).join('|');
+}
+
 // === Minimax с альфа-бета отсечением ===
 
-function minimax(board, zones, depth, alpha, beta, maximizing, aiPlayer, difficulty, deadline) {
+function minimax(board, zones, depth, alpha, beta, maximizing, aiPlayer, difficulty, deadline, aiMoveCount) {
   if (Date.now() > deadline) {
-    return { score: evaluate(board, zones, aiPlayer, difficulty), timeout: true };
+    return { score: evaluate(board, zones, aiPlayer, difficulty, aiMoveCount), timeout: true };
   }
 
   const winner = checkWin(board, zones);
   if (winner === aiPlayer) return { score: 100000 + depth };
   if (winner !== null) return { score: -100000 - depth };
-  if (depth === 0) return { score: evaluate(board, zones, aiPlayer, difficulty) };
+  if (depth === 0) return { score: evaluate(board, zones, aiPlayer, difficulty, aiMoveCount) };
 
   const currentPlayer = maximizing ? aiPlayer : (aiPlayer === 1 ? 2 : 1);
   let moves = getAllMoves(board, zones, currentPlayer);
 
-  if (moves.length === 0) return { score: evaluate(board, zones, aiPlayer, difficulty) };
+  if (moves.length === 0) return { score: evaluate(board, zones, aiPlayer, difficulty, aiMoveCount) };
 
   moves = sortMoves(moves, board, zones, currentPlayer);
 
@@ -183,7 +218,7 @@ function minimax(board, zones, depth, alpha, beta, maximizing, aiPlayer, difficu
     let maxScore = -Infinity;
     for (const move of moves) {
       const newBoard = makeMove(board, move.fromRow, move.fromCol, move.toRow, move.toCol);
-      const result = minimax(newBoard, zones, depth - 1, alpha, beta, false, aiPlayer, difficulty, deadline);
+      const result = minimax(newBoard, zones, depth - 1, alpha, beta, false, aiPlayer, difficulty, deadline, aiMoveCount);
       if (result.score > maxScore) {
         maxScore = result.score;
         bestMove = move;
@@ -197,7 +232,7 @@ function minimax(board, zones, depth, alpha, beta, maximizing, aiPlayer, difficu
     let minScore = Infinity;
     for (const move of moves) {
       const newBoard = makeMove(board, move.fromRow, move.fromCol, move.toRow, move.toCol);
-      const result = minimax(newBoard, zones, depth - 1, alpha, beta, true, aiPlayer, difficulty, deadline);
+      const result = minimax(newBoard, zones, depth - 1, alpha, beta, true, aiPlayer, difficulty, deadline, aiMoveCount);
       if (result.score < minScore) {
         minScore = result.score;
         bestMove = move;
@@ -212,7 +247,7 @@ function minimax(board, zones, depth, alpha, beta, maximizing, aiPlayer, difficu
 
 // === Главная функция ИИ ===
 
-export function getBestMove(board, zones, aiPlayer, difficulty) {
+export function getBestMove(board, zones, aiPlayer, difficulty, recentHashes = new Set(), aiMoveCount = 0) {
   const rows = board.length;
   const cols = board[0].length;
   const isLargeBoard = Math.max(rows, cols) >= 12;
@@ -229,7 +264,9 @@ export function getBestMove(board, zones, aiPlayer, difficulty) {
 
     for (const move of moves) {
       const newBoard = makeMove(board, move.fromRow, move.fromCol, move.toRow, move.toCol);
-      const score = evaluate(newBoard, zones, aiPlayer, difficulty) + (Math.random() * 10 - 5);
+      const h = hashBoard(newBoard);
+      const repeatPenalty = recentHashes.has(h) ? -500 : 0;
+      const score = evaluate(newBoard, zones, aiPlayer, difficulty, aiMoveCount) + repeatPenalty + (Math.random() * 10 - 5);
       if (score > bestScore) {
         bestScore = score;
         bestMove = move;
@@ -247,6 +284,31 @@ export function getBestMove(board, zones, aiPlayer, difficulty) {
     depth = isLargeBoard ? 3 : 4;
   }
 
-  const result = minimax(board, zones, depth, -Infinity, Infinity, true, aiPlayer, difficulty, deadline);
-  return result.move || null;
+  // Оценка кандидатов верхнего уровня со штрафом за повтор
+  const moves = getAllMoves(board, zones, aiPlayer);
+  if (moves.length === 0) return null;
+
+  const sortedMoves = sortMoves(moves, board, zones, aiPlayer);
+
+  let bestMove = sortedMoves[0];
+  let bestScore = -Infinity;
+
+  for (const move of sortedMoves) {
+    const newBoard = makeMove(board, move.fromRow, move.fromCol, move.toRow, move.toCol);
+    const result = minimax(newBoard, zones, depth - 1, -Infinity, Infinity, false, aiPlayer, difficulty, deadline, aiMoveCount);
+
+    // Штраф за повторение недавних позиций
+    const h = hashBoard(newBoard);
+    const repeatPenalty = recentHashes.has(h) ? -500 : 0;
+    const score = result.score + repeatPenalty;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestMove = move;
+    }
+
+    if (Date.now() > deadline) break;
+  }
+
+  return bestMove;
 }
