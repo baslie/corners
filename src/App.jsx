@@ -8,6 +8,15 @@ import {
   checkWin,
 } from './game/logic';
 import { getBestMove, hashBoard } from './game/ai';
+import {
+  gameplayStart,
+  gameplayStop,
+  showInterstitial,
+  showRewarded,
+  loadPlayerData,
+  savePlayerData,
+  submitScore,
+} from './sdk/yandex.js';
 
 // ===================== Пресеты доски =====================
 
@@ -27,6 +36,8 @@ const initialSettings = {
   difficulty: 'medium',
 };
 
+const FREE_UNDO_LIMIT = 2;
+
 function createInitialGameState(settings) {
   const { board, zones } = createBoard(settings.rows, settings.cols, settings.cornerSize);
   let firstPlayer = 1;
@@ -44,6 +55,7 @@ function createInitialGameState(settings) {
     settings,
     history: [],
     startTime: Date.now(),
+    freeUndosLeft: FREE_UNDO_LIMIT,
   };
 }
 
@@ -108,6 +120,7 @@ function gameReducer(state, action) {
         validMoves: null,
         winner: null,
         history: state.history.slice(0, -stepsBack),
+        freeUndosLeft: Math.max(0, state.freeUndosLeft - 1),
       };
     }
     case 'SURRENDER': {
@@ -132,30 +145,31 @@ function gameReducer(state, action) {
 // ===================== Компоненты =====================
 
 function Cell({ value, isSelected, isStep, isJump, isP1Zone, isP2Zone, isOnPath, isCheckerDark, isPlayerPiece, onClick, onMouseEnter, onMouseLeave, isHidden }) {
-  let bg = isCheckerDark ? 'bg-gray-50' : 'bg-white';
-  if (isOnPath) bg = 'bg-amber-200/60 ring-2 ring-amber-400 ring-inset';
-  if (isStep) bg = 'bg-green-400/40';
-  else if (isJump) bg = isOnPath ? 'bg-amber-200/60 ring-2 ring-amber-400 ring-inset' : 'bg-orange-400/40';
-  else if (isP1Zone) bg = isCheckerDark ? 'bg-blue-50' : 'bg-blue-100/60';
-  else if (isP2Zone) bg = isCheckerDark ? 'bg-red-50' : 'bg-red-100/60';
-  if (isSelected) bg += ' ring-3 ring-yellow-400 ring-inset';
+  let bg = isCheckerDark ? 'bg-cell-dark' : 'bg-cell-light';
+  let ring = '';
+  if (isOnPath) { bg = 'bg-cell-path'; ring = 'ring-2 ring-amber-400/40 ring-inset'; }
+  if (isStep) bg = 'bg-cell-step';
+  else if (isJump) { bg = isOnPath ? 'bg-cell-path' : 'bg-cell-jump'; if (isOnPath) ring = 'ring-2 ring-amber-400/40 ring-inset'; }
+  else if (isP1Zone) bg = isCheckerDark ? 'bg-zone-p1-strong' : 'bg-zone-p1';
+  else if (isP2Zone) bg = isCheckerDark ? 'bg-zone-p2-strong' : 'bg-zone-p2';
+  if (isSelected) { ring = 'ring-2 ring-p2/50 ring-inset'; bg += ' bg-cell-selected'; }
 
   return (
     <div
-      className={`w-full aspect-square border border-gray-200 flex items-center justify-center cursor-pointer select-none ${bg} ${!value && !isStep && !isJump ? 'hover:bg-gray-100/80' : ''}`}
-      style={{ touchAction: 'manipulation' }}
+      className={`w-full aspect-square flex items-center justify-center cursor-pointer select-none ${bg} ${ring} ${!value && !isStep && !isJump ? 'hover:bg-cell-hover' : ''}`}
+      style={{ touchAction: 'manipulation', borderWidth: '0.5px', borderColor: 'var(--color-border)' }}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
       {value === 1 && !isHidden && (
-        <div className={`w-[70%] h-[70%] rounded-full bg-blue-500 shadow-md border-2 border-blue-700 ${isPlayerPiece ? 'transition-transform duration-150 hover:scale-110' : ''}`} />
+        <div className={`w-[70%] h-[70%] rounded-full bg-gradient-to-br from-white/30 to-transparent bg-p1 border-2 border-p1-dark shadow-[var(--shadow-piece-p1)] ${isPlayerPiece ? 'transition-transform duration-150 hover:scale-110' : ''}`} />
       )}
       {value === 2 && !isHidden && (
-        <div className={`w-[70%] h-[70%] rounded-full bg-red-500 shadow-md border-2 border-red-700 ${isPlayerPiece ? 'transition-transform duration-150 hover:scale-110' : ''}`} />
+        <div className={`w-[70%] h-[70%] rounded-full bg-gradient-to-br from-white/30 to-transparent bg-p2 border-2 border-p2-dark shadow-[var(--shadow-piece-p2)] ${isPlayerPiece ? 'transition-transform duration-150 hover:scale-110' : ''}`} />
       )}
       {value === null && (isStep || isJump) && (
-        <div className={`w-[30%] h-[30%] rounded-full ${isStep ? 'bg-green-500/60' : 'bg-orange-500/60'}`} />
+        <div className={`w-[30%] h-[30%] rounded-full ${isStep ? 'bg-success/50' : 'bg-p2/50'}`} />
       )}
     </div>
   );
@@ -169,14 +183,15 @@ function GhostPiece({ player, row, col, rows, cols }) {
 
   return (
     <div
-      className="ghost-piece rounded-full shadow-lg"
+      className="ghost-piece rounded-full"
       style={{
         left: `${col * cellW + offset * cellW}%`,
         top: `${row * cellH + offset * cellH}%`,
         width: `${cellW * size / 100}%`,
         height: `${cellH * size / 100}%`,
-        backgroundColor: player === 1 ? '#3b82f6' : '#ef4444',
-        border: `2px solid ${player === 1 ? '#1d4ed8' : '#b91c1c'}`,
+        backgroundColor: player === 1 ? 'var(--color-p1)' : 'var(--color-p2)',
+        border: `2px solid ${player === 1 ? 'var(--color-p1-dark)' : 'var(--color-p2-dark)'}`,
+        boxShadow: player === 1 ? 'var(--shadow-piece-p1), 0 4px 16px rgba(13,148,136,0.4)' : 'var(--shadow-piece-p2), 0 4px 16px rgba(234,88,12,0.4)',
         opacity: 0.9,
       }}
     />
@@ -250,7 +265,7 @@ function Board({ state, dispatch, isLocked, hiddenCell, onPlayerMove, ghostPiece
   return (
     <div className="relative" ref={boardRef}>
       <div
-        className="grid gap-0 border border-gray-300 bg-white shadow-sm rounded-sm overflow-hidden"
+        className="grid gap-0 border border-border bg-surface shadow-[var(--shadow-lg)] rounded-[var(--radius-md)] overflow-hidden"
         style={{
           gridTemplateColumns: `repeat(${board[0].length}, 1fr)`,
         }}
@@ -332,61 +347,61 @@ function InfoPanel({ state, isThinking, elapsed }) {
   const difficultyLabel = { easy: 'Лёгкий', medium: 'Средний', hard: 'Сложный' };
 
   return (
-    <div className="flex flex-col gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm min-w-[220px] lg:min-w-[220px]">
+    <div className="flex flex-col gap-4 p-4 bg-surface rounded-[var(--radius-lg)] border border-border shadow-[var(--shadow-md)] min-w-[220px] lg:min-w-[220px]">
       <div className="text-center">
-        <div className="text-sm text-gray-500 mb-1">Сейчас ходит</div>
-        <div className="flex items-center justify-center gap-2 text-lg font-bold">
-          <div className={`w-5 h-5 rounded-full ${currentPlayer === 1 ? 'bg-blue-500' : 'bg-red-500'}`} />
+        <div className="text-sm text-text-dim mb-1">Сейчас ходит</div>
+        <div className="flex items-center justify-center gap-2 text-lg font-bold text-text">
+          <div className={`w-5 h-5 rounded-full ${currentPlayer === 1 ? 'bg-p1 shadow-[0_0_8px_var(--color-p1-glow)]' : 'bg-p2 shadow-[0_0_8px_var(--color-p2-glow)]'}`} />
           {turnLabel}
         </div>
         {isThinking && (
-          <div className="flex items-center justify-center gap-2 mt-2 text-sm text-gray-500">
+          <div className="flex items-center justify-center gap-2 mt-2 text-sm text-text-dim">
             <div className="flex gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-p1 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-p1 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-p1 animate-bounce" style={{ animationDelay: '300ms' }} />
             </div>
             думает...
           </div>
         )}
       </div>
 
-      <div className="border-t border-gray-200 pt-3">
-        <div className="text-sm text-gray-500 mb-2">Ходов сделано</div>
+      <div className="border-t border-border pt-3">
+        <div className="text-sm text-text-dim mb-2">Ходов сделано</div>
         <div className="flex justify-between">
           <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-blue-500 inline-block" />
+            <span className="w-3 h-3 rounded-full bg-p1 inline-block" />
             {isVsComputer ? 'ИИ' : 'Игрок 1'}: {moveCount[1]}
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-red-500 inline-block" />
+            <span className="w-3 h-3 rounded-full bg-p2 inline-block" />
             {isVsComputer ? 'Вы' : 'Игрок 2'}: {moveCount[2]}
           </span>
         </div>
       </div>
 
-      <div className="border-t border-gray-200 pt-3">
-        <div className="text-sm text-gray-500 mb-2">Прогресс</div>
+      <div className="border-t border-border pt-3">
+        <div className="text-sm text-text-dim mb-2">Прогресс</div>
         <ProgressBar
           label={isVsComputer ? 'Компьютер' : 'Игрок 1'}
-          color="bg-blue-500"
+          player={1}
           current={progress.p1.current}
           total={progress.p1.total}
         />
         <ProgressBar
           label={isVsComputer ? 'Вы' : 'Игрок 2'}
-          color="bg-red-500"
+          player={2}
           current={progress.p2.current}
           total={progress.p2.total}
         />
       </div>
 
-      <div className="border-t border-gray-200 pt-3">
-        <div className="text-sm text-gray-500 mb-1">Время</div>
-        <div className="text-center text-lg font-mono font-semibold text-gray-700">{formatTime(elapsed)}</div>
+      <div className="border-t border-border pt-3">
+        <div className="text-sm text-text-dim mb-1">Время</div>
+        <div className="text-center text-lg font-mono font-semibold text-text tracking-wider">{formatTime(elapsed)}</div>
       </div>
 
-      <div className="border-t border-gray-200 pt-3 text-xs text-gray-400 text-center space-y-0.5">
+      <div className="border-t border-border pt-3 text-xs text-text-muted text-center space-y-0.5">
         <div>Поле {settings.rows}&times;{settings.cols}</div>
         {isVsComputer && (
           <div>Сложность: {difficultyLabel[settings.difficulty]}</div>
@@ -396,16 +411,19 @@ function InfoPanel({ state, isThinking, elapsed }) {
   );
 }
 
-function ProgressBar({ label, color, current, total }) {
+function ProgressBar({ label, player, current, total }) {
   const pct = total > 0 ? (current / total) * 100 : 0;
+  const gradientStyle = player === 1
+    ? { background: 'linear-gradient(90deg, var(--color-p1), #2dd4bf)' }
+    : { background: 'linear-gradient(90deg, var(--color-p2), #fb923c)' };
   return (
     <div className="mb-2">
       <div className="flex justify-between text-xs mb-0.5">
         <span>{label}</span>
         <span>{current}/{total}</span>
       </div>
-      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-        <div className={`h-full ${color} rounded-full transition-all duration-300`} style={{ width: `${pct}%` }} />
+      <div className="w-full h-2 bg-surface-alt rounded-full overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-300" style={{ width: `${pct}%`, ...gradientStyle }} />
       </div>
     </div>
   );
@@ -419,29 +437,33 @@ function GameOver({ winner, moveCount, onRematch, onMenu, isVsComputer, elapsed 
     title = `Игрок ${winner} победил!`;
   }
 
+  const iconBg = winner === AI_PLAYER ? 'bg-p1-soft' : 'bg-p2-soft';
+
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 game-over-backdrop">
-      <div className="bg-white rounded-xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center game-over-modal">
-        <div className="text-4xl mb-4">{winner === AI_PLAYER ? '🤖' : '🎉'}</div>
-        <h2 className="text-2xl font-bold mb-2">{title}</h2>
-        <div className="text-gray-500 mb-2">
+    <div className="fixed inset-0 bg-backdrop backdrop-blur-md flex items-center justify-center z-50 game-over-backdrop">
+      <div className="bg-surface border border-border rounded-[var(--radius-xl)] shadow-[var(--shadow-xl)] p-8 max-w-sm w-full mx-4 text-center game-over-modal">
+        <div className={`w-16 h-16 rounded-full ${iconBg} flex items-center justify-center text-3xl mx-auto mb-4`}>
+          {winner === AI_PLAYER ? '🤖' : '🎉'}
+        </div>
+        <h2 className="text-2xl font-bold mb-2 text-text">{title}</h2>
+        <div className="text-text-dim mb-2">
           {isVsComputer
             ? `Ходов: Вы — ${moveCount[2]}, Компьютер — ${moveCount[1]}`
             : `Ходов: Игрок 1 — ${moveCount[1]}, Игрок 2 — ${moveCount[2]}`}
         </div>
-        <div className="text-gray-400 text-sm mb-6">
+        <div className="text-text-muted text-sm mb-6">
           Время: {formatTime(elapsed)}
         </div>
         <div className="flex gap-3 justify-center">
           <button
             onClick={onRematch}
-            className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium cursor-pointer transition-all duration-150 active:scale-95"
+            className="px-5 py-2.5 bg-accent text-white rounded-[var(--radius-md)] hover:bg-accent-hover font-medium cursor-pointer transition-all duration-150 active:scale-95"
           >
             Реванш
           </button>
           <button
             onClick={onMenu}
-            className="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium cursor-pointer transition-all duration-150 active:scale-95"
+            className="px-5 py-2.5 bg-surface-alt text-text-dim border border-border rounded-[var(--radius-md)] hover:border-border-strong font-medium cursor-pointer transition-all duration-150 active:scale-95"
           >
             В меню
           </button>
@@ -493,7 +515,7 @@ function useAnimation(dispatch) {
   return { ghostPiece, hiddenCell, animate, animating };
 }
 
-function Game({ settings, onMenu }) {
+function Game({ settings, onMenu, playerStats, onStatsUpdate }) {
   const [state, dispatch] = useReducer(gameReducer, settings, createInitialGameState);
   const [isThinking, setIsThinking] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -501,6 +523,44 @@ function Game({ settings, onMenu }) {
   const { ghostPiece, hiddenCell, animate, animating } = useAnimation(dispatch);
 
   const isVsComputer = !!settings.difficulty;
+
+  // Lifecycle: gameplayStart при маунте, gameplayStop при анмаунте
+  useEffect(() => {
+    gameplayStart();
+    return () => gameplayStop();
+  }, []);
+
+  // Lifecycle: gameplayStop при победе
+  useEffect(() => {
+    if (state.winner) {
+      gameplayStop();
+    }
+  }, [state.winner]);
+
+  // Сохранение статистики и отправка в лидерборд при победе
+  useEffect(() => {
+    if (!state.winner || !isVsComputer) return;
+    const elapsedMs = Date.now() - state.startTime;
+    const playerWon = state.winner !== AI_PLAYER;
+    const newStats = {
+      ...playerStats,
+      totalGames: (playerStats.totalGames || 0) + 1,
+      wins: (playerStats.wins || 0) + (playerWon ? 1 : 0),
+      losses: (playerStats.losses || 0) + (playerWon ? 0 : 1),
+    };
+    if (playerWon) {
+      const moves = state.moveCount[2]; // player is 2
+      if (newStats.bestMoves === null || moves < newStats.bestMoves) {
+        newStats.bestMoves = moves;
+      }
+      if (newStats.bestTime === null || elapsedMs < newStats.bestTime) {
+        newStats.bestTime = elapsedMs;
+      }
+      submitScore('main', moves);
+    }
+    onStatsUpdate(newStats);
+    savePlayerData(newStats);
+  }, [state.winner]);
 
   // Таймер игры
   useEffect(() => {
@@ -580,38 +640,55 @@ function Game({ settings, onMenu }) {
     };
   }, [state.currentPlayer, state.winner, state.board, isVsComputer, settings.difficulty, animate, state.zones, animating]);
 
-  const handleRematch = useCallback(() => {
+  const handleRematch = useCallback(async () => {
+    await showInterstitial();
     dispatch({ type: 'RESET' });
     setIsThinking(false);
     setElapsed(0);
     aiRunning.current = false;
   }, []);
 
+  const handleBackToMenu = useCallback(async () => {
+    await showInterstitial();
+    onMenu();
+  }, [onMenu]);
+
+  const handleUndo = useCallback(async () => {
+    if (state.freeUndosLeft > 0) {
+      dispatch({ type: 'UNDO' });
+    } else {
+      const rewarded = await showRewarded();
+      if (rewarded) {
+        dispatch({ type: 'UNDO' });
+      }
+    }
+  }, [state.freeUndosLeft]);
+
   const isPlayerTurnBlocked = isVsComputer && state.currentPlayer === AI_PLAYER;
 
   return (
-    <div className="min-h-screen bg-gray-100 p-2 sm:p-4">
+    <div className="min-h-screen bg-bg p-2 sm:p-4">
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Уголки</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-text tracking-tight">Уголки</h1>
           <div className="flex gap-1.5 sm:gap-2 flex-wrap">
             <button
-              onClick={() => dispatch({ type: 'UNDO' })}
+              onClick={handleUndo}
               disabled={state.history.length === 0 || isThinking || !!state.winner || animating.current}
-              className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 cursor-pointer transition-all duration-150 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface border border-border text-text-dim rounded-[var(--radius-sm)] hover:border-border-strong cursor-pointer transition-all duration-150 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Отменить ход
+              {state.freeUndosLeft > 0 ? `Отменить (${state.freeUndosLeft})` : 'Отменить (реклама)'}
             </button>
             <button
               onClick={() => dispatch({ type: 'SURRENDER' })}
               disabled={!!state.winner || isThinking || animating.current}
-              className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 cursor-pointer transition-all duration-150 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-danger-soft text-danger border border-transparent rounded-[var(--radius-sm)] hover:opacity-80 cursor-pointer transition-all duration-150 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Сдаться
             </button>
             <button
-              onClick={onMenu}
-              className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 cursor-pointer transition-all duration-150 active:scale-95"
+              onClick={handleBackToMenu}
+              className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface border border-border text-text-dim rounded-[var(--radius-sm)] hover:border-border-strong cursor-pointer transition-all duration-150 active:scale-95"
             >
               В меню
             </button>
@@ -637,7 +714,7 @@ function Game({ settings, onMenu }) {
           winner={state.winner}
           moveCount={state.moveCount}
           onRematch={handleRematch}
-          onMenu={onMenu}
+          onMenu={handleBackToMenu}
           isVsComputer={isVsComputer}
           elapsed={elapsed}
         />
@@ -654,7 +731,7 @@ function BoardPreview({ rows, cols, cornerSize }) {
 
   return (
     <div
-      className="grid gap-px bg-gray-300 border border-gray-400 mx-auto"
+      className="grid gap-px bg-border border border-border-strong rounded-[var(--radius-xs)] overflow-hidden mx-auto"
       style={{
         gridTemplateColumns: `repeat(${cols}, ${cellSize}px)`,
         gridTemplateRows: `repeat(${rows}, ${cellSize}px)`,
@@ -667,7 +744,7 @@ function BoardPreview({ rows, cols, cornerSize }) {
           return (
             <div
               key={`${r},${c}`}
-              className={`${isP1 ? 'bg-blue-300' : isP2 ? 'bg-red-300' : 'bg-white'}`}
+              className={`${isP1 ? 'bg-p1/20' : isP2 ? 'bg-p2/20' : 'bg-surface'}`}
             />
           );
         }),
@@ -684,7 +761,7 @@ const DIFFICULTY_OPTIONS = [
   { value: 'hard', label: 'Сложный' },
 ];
 
-function Lobby({ onStart }) {
+function Lobby({ onStart, playerStats }) {
   const [settings, setSettings] = useReducer(
     (s, a) => ({ ...s, ...a }),
     initialSettings,
@@ -693,16 +770,16 @@ function Lobby({ onStart }) {
   const activePreset = BOARD_PRESETS.find((p) => p.rows === settings.rows) || BOARD_PRESETS[0];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-red-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
-        <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-blue-600 to-red-500 bg-clip-text text-transparent">Уголки</h1>
-        <p className="text-center text-gray-500 text-sm mb-4">
+    <div className="min-h-screen lobby-bg flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-surface rounded-[var(--radius-2xl)] shadow-[var(--shadow-xl)] border border-border p-6 max-w-md w-full lobby-card">
+        <h1 className="text-3xl font-bold text-center mb-2 tracking-tight bg-gradient-to-r from-p1 to-p2 bg-clip-text text-transparent">Уголки</h1>
+        <p className="text-center text-text-dim text-sm mb-4">
           Переместите все фишки в противоположный угол раньше соперника
         </p>
 
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">Размер доски</label>
+            <label className="text-sm font-medium text-text mb-2 block">Размер доски</label>
             <div className="flex gap-2">
               {BOARD_PRESETS.map((preset) => {
                 const active = activePreset.key === preset.key;
@@ -710,11 +787,11 @@ function Lobby({ onStart }) {
                   <button
                     key={preset.key}
                     onClick={() => setSettings({ rows: preset.rows, cols: preset.cols, cornerSize: preset.cornerSize })}
-                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors cursor-pointer
-                      ${active ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                    className={`flex-1 py-2 px-3 rounded-[var(--radius-sm)] text-sm font-medium transition-all cursor-pointer
+                      ${active ? 'bg-accent text-white shadow-[var(--shadow-sm)]' : 'bg-surface-alt text-text-dim border border-border hover:border-border-strong'}`}
                   >
                     <div>{preset.label}</div>
-                    <div className={`text-xs ${active ? 'text-blue-200' : 'text-gray-400'}`}>{preset.description}</div>
+                    <div className={`text-xs ${active ? 'text-white/60' : 'text-text-muted'}`}>{preset.description}</div>
                   </button>
                 );
               })}
@@ -722,14 +799,14 @@ function Lobby({ onStart }) {
           </div>
 
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">Сложность ИИ</label>
+            <label className="text-sm font-medium text-text mb-2 block">Сложность ИИ</label>
             <div className="flex gap-2">
               {DIFFICULTY_OPTIONS.map(({ value, label }) => (
                 <button
                   key={value}
                   onClick={() => setSettings({ difficulty: value })}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors cursor-pointer
-                    ${settings.difficulty === value ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                  className={`flex-1 py-2 px-3 rounded-[var(--radius-sm)] text-sm font-medium transition-all cursor-pointer
+                    ${settings.difficulty === value ? 'bg-accent text-white shadow-[var(--shadow-sm)]' : 'bg-surface-alt text-text-dim border border-border hover:border-border-strong'}`}
                 >
                   {label}
                 </button>
@@ -741,9 +818,39 @@ function Lobby({ onStart }) {
             <BoardPreview rows={settings.rows} cols={settings.cols} cornerSize={settings.cornerSize} />
           </div>
 
+          {playerStats.totalGames > 0 && (
+            <div className="bg-surface-alt rounded-[var(--radius-md)] p-3 border border-border">
+              <div className="text-sm font-medium text-text mb-2">Ваша статистика</div>
+              <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                <div>
+                  <div className="text-text-muted text-xs">Игр</div>
+                  <div className="font-semibold text-text">{playerStats.totalGames}</div>
+                </div>
+                <div>
+                  <div className="text-text-muted text-xs">Побед</div>
+                  <div className="font-semibold text-success">{playerStats.wins}</div>
+                </div>
+                <div>
+                  <div className="text-text-muted text-xs">Поражений</div>
+                  <div className="font-semibold text-danger">{playerStats.losses}</div>
+                </div>
+              </div>
+              {(playerStats.bestMoves !== null || playerStats.bestTime !== null) && (
+                <div className="mt-2 pt-2 border-t border-border flex justify-around text-xs text-text-dim">
+                  {playerStats.bestMoves !== null && (
+                    <span>Лучший результат: {playerStats.bestMoves} ходов</span>
+                  )}
+                  {playerStats.bestTime !== null && (
+                    <span>Лучшее время: {formatTime(playerStats.bestTime)}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <button
             onClick={() => onStart(settings)}
-            className="w-full py-3 bg-blue-600 text-white rounded-xl text-lg font-semibold hover:bg-blue-700 transition-all duration-150 active:scale-95 cursor-pointer"
+            className="btn-shimmer w-full py-3 bg-accent text-white rounded-[var(--radius-lg)] text-lg font-semibold hover:bg-accent-hover shadow-[var(--shadow-md)] transition-all duration-150 active:scale-95 cursor-pointer"
           >
             Начать игру
           </button>
@@ -753,14 +860,46 @@ function Lobby({ onStart }) {
   );
 }
 
+// ===================== Default stats =====================
+
+const DEFAULT_STATS = {
+  totalGames: 0,
+  wins: 0,
+  losses: 0,
+  bestMoves: null,
+  bestTime: null,
+};
+
 // ===================== App =====================
 
 export default function App() {
   const [screen, setScreen] = useReducer((_, a) => a, { type: 'lobby' });
+  const [playerStats, setPlayerStats] = useState(DEFAULT_STATS);
+
+  // Загрузка статистики при маунте
+  useEffect(() => {
+    loadPlayerData().then((data) => {
+      if (data && typeof data.totalGames === 'number') {
+        setPlayerStats({ ...DEFAULT_STATS, ...data });
+      }
+    });
+  }, []);
 
   if (screen.type === 'game') {
-    return <Game settings={screen.settings} onMenu={() => setScreen({ type: 'lobby' })} />;
+    return (
+      <Game
+        settings={screen.settings}
+        onMenu={() => setScreen({ type: 'lobby' })}
+        playerStats={playerStats}
+        onStatsUpdate={setPlayerStats}
+      />
+    );
   }
 
-  return <Lobby onStart={(settings) => setScreen({ type: 'game', settings })} />;
+  return (
+    <Lobby
+      onStart={(settings) => setScreen({ type: 'game', settings })}
+      playerStats={playerStats}
+    />
+  );
 }

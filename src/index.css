@@ -1,11 +1,118 @@
 @import "tailwindcss";
 
+/* ======================== Font Faces ======================== */
+
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('./fonts/Manrope-Variable-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('./fonts/Manrope-Variable-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ======================== Theme Tokens ======================== */
+
+@theme inline {
+  --color-bg: #f8f6f3;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f2efeb;
+  --color-border: #e5e1db;
+  --color-border-strong: #d6d1c9;
+  --color-text: #1c1917;
+  --color-text-dim: #78716c;
+  --color-text-muted: #a8a29e;
+
+  --color-p1: #0d9488;
+  --color-p1-dark: #0f766e;
+  --color-p1-soft: rgba(13, 148, 136, 0.1);
+  --color-p1-glow: rgba(13, 148, 136, 0.2);
+
+  --color-p2: #ea580c;
+  --color-p2-dark: #c2410c;
+  --color-p2-soft: rgba(234, 88, 12, 0.1);
+  --color-p2-glow: rgba(234, 88, 12, 0.2);
+
+  --color-accent: #4338ca;
+  --color-accent-hover: #3730a3;
+  --color-accent-soft: rgba(67, 56, 202, 0.08);
+  --color-success: #059669;
+  --color-success-soft: rgba(5, 150, 105, 0.12);
+  --color-danger: #dc2626;
+  --color-danger-soft: rgba(220, 38, 38, 0.08);
+
+  --color-cell-light: #ffffff;
+  --color-cell-dark: #f5f2ee;
+  --color-cell-step: rgba(5, 150, 105, 0.15);
+  --color-cell-jump: rgba(234, 88, 12, 0.15);
+  --color-cell-path: rgba(245, 158, 11, 0.12);
+  --color-cell-hover: rgba(0, 0, 0, 0.03);
+  --color-cell-selected: rgba(234, 88, 12, 0.18);
+  --color-zone-p1: rgba(13, 148, 136, 0.06);
+  --color-zone-p2: rgba(234, 88, 12, 0.06);
+  --color-zone-p1-strong: rgba(13, 148, 136, 0.1);
+  --color-zone-p2-strong: rgba(234, 88, 12, 0.1);
+
+  --color-backdrop: rgba(28, 25, 23, 0.5);
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  --shadow-xs: 0 1px 2px rgba(28, 25, 23, 0.05);
+  --shadow-sm: 0 1px 3px rgba(28, 25, 23, 0.08), 0 1px 2px rgba(28, 25, 23, 0.04);
+  --shadow-md: 0 4px 12px rgba(28, 25, 23, 0.08), 0 2px 4px rgba(28, 25, 23, 0.04);
+  --shadow-lg: 0 8px 25px rgba(28, 25, 23, 0.1), 0 4px 10px rgba(28, 25, 23, 0.05);
+  --shadow-xl: 0 16px 40px rgba(28, 25, 23, 0.12), 0 6px 16px rgba(28, 25, 23, 0.06);
+  --shadow-piece-p1: 0 2px 8px rgba(13, 148, 136, 0.3), 0 0 0 1px rgba(13, 148, 136, 0.1);
+  --shadow-piece-p2: 0 2px 8px rgba(234, 88, 12, 0.3), 0 0 0 1px rgba(234, 88, 12, 0.1);
+
+  --font-sans: 'Manrope', system-ui, -apple-system, sans-serif;
+
+  --transition-fast: 100ms ease;
+  --transition-normal: 200ms ease-out;
+  --transition-slow: 350ms ease-out;
+}
+
+/* ======================== Base Styles ======================== */
+
 body {
   margin: 0;
   min-height: 100vh;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Ghost piece animation */
+::selection {
+  background: var(--color-accent);
+  color: white;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: var(--radius-full);
+}
+
+/* ======================== Ghost Piece Animation ======================== */
+
 .ghost-piece {
   position: absolute;
   transition: left 200ms ease-in-out, top 200ms ease-in-out;
@@ -13,13 +120,27 @@ body {
   z-index: 10;
 }
 
-/* GameOver modal animation */
+/* ======================== Lobby Background ======================== */
+
+.lobby-bg {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 40%, rgba(13, 148, 136, 0.04), transparent),
+    radial-gradient(ellipse 60% 50% at 80% 80%, rgba(234, 88, 12, 0.03), transparent),
+    var(--color-bg);
+}
+
+/* ======================== Animations ======================== */
+
 .game-over-backdrop {
-  animation: fadeIn 200ms ease-out;
+  animation: fadeIn 250ms ease-out;
 }
 
 .game-over-modal {
-  animation: scaleIn 250ms ease-out;
+  animation: scaleIn 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.lobby-card {
+  animation: slideUp 400ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes fadeIn {
@@ -28,6 +149,36 @@ body {
 }
 
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ======================== Shimmer Button ======================== */
+
+.btn-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2.5s ease-in-out infinite;
 }
