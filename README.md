@@ -25,10 +25,23 @@
 
 ## Запуск
 
+**Требования:** Node.js 18+
+
 ```bash
 npm install
 npm run dev
 ```
+
+Dev-сервер запустится на `http://localhost:5173`.
+
+### Доступные скрипты
+
+| Команда             | Описание                          |
+|---------------------|-----------------------------------|
+| `npm run dev`       | Запуск dev-сервера с HMR          |
+| `npm run build`     | Production-сборка в `dist/`       |
+| `npm run preview`   | Превью production-сборки          |
+| `npm run lint`      | Линтинг кода (ESLint)             |
 
 ## Лицензия
 
