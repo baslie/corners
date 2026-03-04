@@ -347,65 +347,88 @@ function InfoPanel({ state, isThinking, elapsed }) {
   const difficultyLabel = { easy: 'Лёгкий', medium: 'Средний', hard: 'Сложный' };
 
   return (
-    <div className="flex flex-col gap-4 p-4 bg-surface rounded-[var(--radius-lg)] border border-border shadow-[var(--shadow-md)] min-w-[220px] lg:min-w-[220px]">
-      <div className="text-center">
-        <div className="text-sm text-text-dim mb-1">Сейчас ходит</div>
-        <div className="flex items-center justify-center gap-2 text-lg font-bold text-text">
-          <div className={`w-5 h-5 rounded-full ${currentPlayer === 1 ? 'bg-p1 shadow-[0_0_8px_var(--color-p1-glow)]' : 'bg-p2 shadow-[0_0_8px_var(--color-p2-glow)]'}`} />
-          {turnLabel}
-        </div>
-        {isThinking && (
-          <div className="flex items-center justify-center gap-2 mt-2 text-sm text-text-dim">
-            <div className="flex gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-p1 animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-p1 animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-p1 animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-            думает...
+    <div className="w-full max-w-[min(95vw,600px)] lg:w-auto lg:max-w-none flex flex-col gap-2 lg:gap-4 p-3 lg:p-4 bg-surface rounded-[var(--radius-lg)] border border-border shadow-[var(--shadow-md)] lg:min-w-[220px]">
+      {/* Строка статуса: на мобильных горизонтально, на десктопе — вертикально */}
+      <div className="flex items-center justify-between gap-3 lg:flex-col lg:items-stretch lg:gap-0">
+
+        {/* Ход */}
+        <div className="text-center min-w-0">
+          <div className="text-xs lg:text-sm text-text-dim lg:mb-1">
+            <span className="lg:hidden">Ход</span>
+            <span className="hidden lg:inline">Сейчас ходит</span>
           </div>
-        )}
+          <div className="flex items-center justify-center gap-1.5 lg:gap-2 text-sm lg:text-lg font-bold text-text">
+            <div className={`w-4 h-4 lg:w-5 lg:h-5 rounded-full shrink-0 ${currentPlayer === 1 ? 'bg-p1 shadow-[0_0_8px_var(--color-p1-glow)]' : 'bg-p2 shadow-[0_0_8px_var(--color-p2-glow)]'}`} />
+            <span className="truncate">{turnLabel}</span>
+          </div>
+          {isThinking && (
+            <div className="flex items-center justify-center gap-1.5 mt-1 lg:mt-2 text-xs lg:text-sm text-text-dim">
+              <div className="flex gap-1">
+                <span className="w-1 h-1 lg:w-1.5 lg:h-1.5 rounded-full bg-p1 animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1 h-1 lg:w-1.5 lg:h-1.5 rounded-full bg-p1 animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1 h-1 lg:w-1.5 lg:h-1.5 rounded-full bg-p1 animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+              думает...
+            </div>
+          )}
+        </div>
+
+        {/* Ходы */}
+        <div className="lg:border-t lg:border-border lg:pt-3 lg:mt-4 min-w-0">
+          <div className="text-xs lg:text-sm text-text-dim lg:mb-2">
+            <span className="lg:hidden">Ходы</span>
+            <span className="hidden lg:inline">Ходов сделано</span>
+          </div>
+          <div className="flex gap-2 lg:justify-between text-xs lg:text-sm">
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 lg:w-3 lg:h-3 rounded-full bg-p1 inline-block shrink-0" />
+              <span className="lg:hidden">{isVsComputer ? 'ИИ' : 'И1'}</span>
+              <span className="hidden lg:inline">{isVsComputer ? 'ИИ' : 'Игрок 1'}</span>: {moveCount[1]}
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 lg:w-3 lg:h-3 rounded-full bg-p2 inline-block shrink-0" />
+              <span className="lg:hidden">{isVsComputer ? 'Вы' : 'И2'}</span>
+              <span className="hidden lg:inline">{isVsComputer ? 'Вы' : 'Игрок 2'}</span>: {moveCount[2]}
+            </span>
+          </div>
+        </div>
+
+        {/* Время */}
+        <div className="lg:border-t lg:border-border lg:pt-3 lg:mt-4 text-center min-w-0">
+          <div className="text-xs lg:text-sm text-text-dim">Время</div>
+          <div className="text-sm lg:text-lg font-mono font-semibold text-text tracking-wider">{formatTime(elapsed)}</div>
+        </div>
+
       </div>
 
-      <div className="border-t border-border pt-3">
-        <div className="text-sm text-text-dim mb-2">Ходов сделано</div>
-        <div className="flex justify-between">
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-p1 inline-block" />
-            {isVsComputer ? 'ИИ' : 'Игрок 1'}: {moveCount[1]}
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-p2 inline-block" />
-            {isVsComputer ? 'Вы' : 'Игрок 2'}: {moveCount[2]}
-          </span>
+      {/* Прогресс */}
+      <div className="border-t border-border pt-2 lg:pt-3">
+        <div className="hidden lg:block text-sm text-text-dim mb-2">Прогресс</div>
+        <div className="grid grid-cols-2 lg:grid-cols-1 gap-x-4 gap-y-0">
+          <ProgressBar
+            label={isVsComputer ? 'Компьютер' : 'Игрок 1'}
+            player={1}
+            current={progress.p1.current}
+            total={progress.p1.total}
+          />
+          <ProgressBar
+            label={isVsComputer ? 'Вы' : 'Игрок 2'}
+            player={2}
+            current={progress.p2.current}
+            total={progress.p2.total}
+          />
         </div>
       </div>
 
-      <div className="border-t border-border pt-3">
-        <div className="text-sm text-text-dim mb-2">Прогресс</div>
-        <ProgressBar
-          label={isVsComputer ? 'Компьютер' : 'Игрок 1'}
-          player={1}
-          current={progress.p1.current}
-          total={progress.p1.total}
-        />
-        <ProgressBar
-          label={isVsComputer ? 'Вы' : 'Игрок 2'}
-          player={2}
-          current={progress.p2.current}
-          total={progress.p2.total}
-        />
-      </div>
-
-      <div className="border-t border-border pt-3">
-        <div className="text-sm text-text-dim mb-1">Время</div>
-        <div className="text-center text-lg font-mono font-semibold text-text tracking-wider">{formatTime(elapsed)}</div>
-      </div>
-
-      <div className="border-t border-border pt-3 text-xs text-text-muted text-center space-y-0.5">
-        <div>Поле {settings.rows}&times;{settings.cols}</div>
-        {isVsComputer && (
-          <div>Сложность: {difficultyLabel[settings.difficulty]}</div>
-        )}
+      {/* Инфо — на мобильных в одну строку, на десктопе полный вариант */}
+      <div className="border-t border-border pt-1 lg:pt-3 text-xs text-text-muted text-center">
+        <span className="lg:hidden">{settings.rows}&times;{settings.cols}{isVsComputer && ` · ${difficultyLabel[settings.difficulty]}`}</span>
+        <div className="hidden lg:block space-y-0.5">
+          <div>Поле {settings.rows}&times;{settings.cols}</div>
+          {isVsComputer && (
+            <div>Сложность: {difficultyLabel[settings.difficulty]}</div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -694,7 +717,7 @@ function Game({ settings, onMenu, playerStats, onStatsUpdate }) {
             </button>
           </div>
         </div>
-        <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 items-start justify-center">
+        <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 items-center lg:items-start justify-center">
           <div className="w-full max-w-[min(95vw,600px)] lg:max-w-[min(70vh,600px)]">
             <Board
               state={state}
