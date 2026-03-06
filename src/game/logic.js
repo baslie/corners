@@ -70,15 +70,11 @@ export function getValidMoves(board, row, col, zones, currentPlayer) {
   const jumps = [];
   const jumpPaths = new Map();
 
-  const finishZone = currentPlayer === 1 ? zones.player2 : zones.player1;
-  const pieceInFinish = finishZone.has(key(row, col));
-
   // Шаги — 4 соседних клетки
   for (const [dr, dc] of DIRECTIONS) {
     const nr = row + dr;
     const nc = col + dc;
     if (inBounds(nr, nc, rows, cols) && board[nr][nc] === null) {
-      if (pieceInFinish && !finishZone.has(key(nr, nc))) continue;
       steps.push([nr, nc]);
     }
   }
@@ -102,7 +98,6 @@ export function getValidMoves(board, row, col, zones, currentPlayer) {
         board[lr][lc] === null &&
         !visited.has(key(lr, lc))
       ) {
-        if (pieceInFinish && !finishZone.has(key(lr, lc))) continue;
         visited.add(key(lr, lc));
         const newPath = [...path, [cr, cc]];
         jumps.push([lr, lc]);
