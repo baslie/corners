@@ -23,14 +23,14 @@
 /* ======================== Theme Tokens ======================== */
 
 @theme inline {
-  --color-bg: #f8f6f3;
+  --color-bg: #ede9e3;
   --color-surface: #ffffff;
   --color-surface-alt: #f2efeb;
   --color-border: #e5e1db;
   --color-border-strong: #d6d1c9;
   --color-text: #1c1917;
-  --color-text-dim: #78716c;
-  --color-text-muted: #a8a29e;
+  --color-text-dim: #6b6560;
+  --color-text-muted: #787069;
 
   --color-p1: #0d9488;
   --color-p1-dark: #0f766e;
@@ -42,25 +42,30 @@
   --color-p2-soft: rgba(234, 88, 12, 0.1);
   --color-p2-glow: rgba(234, 88, 12, 0.2);
 
-  --color-accent: #4338ca;
-  --color-accent-hover: #3730a3;
-  --color-accent-soft: rgba(67, 56, 202, 0.08);
+  --color-accent: #0c1a75;
+  --color-accent-hover: #0a1563;
+  --color-accent-soft: rgba(12, 26, 117, 0.12);
   --color-success: #059669;
   --color-success-soft: rgba(5, 150, 105, 0.12);
   --color-danger: #dc2626;
-  --color-danger-soft: rgba(220, 38, 38, 0.08);
+  --color-danger-soft: rgba(220, 38, 38, 0.12);
 
   --color-cell-light: #ffffff;
   --color-cell-dark: #f5f2ee;
-  --color-cell-step: rgba(5, 150, 105, 0.15);
-  --color-cell-jump: rgba(234, 88, 12, 0.15);
+  --color-cell-step-p1: rgba(13, 148, 136, 0.12);
+  --color-cell-step-p2: rgba(234, 88, 12, 0.12);
+  --color-cell-jump-p1: rgba(13, 148, 136, 0.22);
+  --color-cell-jump-p2: rgba(234, 88, 12, 0.22);
   --color-cell-path: rgba(245, 158, 11, 0.12);
   --color-cell-hover: rgba(0, 0, 0, 0.03);
-  --color-cell-selected: rgba(234, 88, 12, 0.18);
+  --color-cell-selected: rgba(12, 26, 117, 0.12);
+
   --color-zone-p1: rgba(13, 148, 136, 0.06);
   --color-zone-p2: rgba(234, 88, 12, 0.06);
   --color-zone-p1-strong: rgba(13, 148, 136, 0.1);
   --color-zone-p2-strong: rgba(234, 88, 12, 0.1);
+
+  --gradient-title: linear-gradient(to right, var(--color-accent), #dc2626);
 
   --color-backdrop: rgba(28, 25, 23, 0.5);
 
@@ -77,14 +82,33 @@
   --shadow-md: 0 4px 12px rgba(28, 25, 23, 0.08), 0 2px 4px rgba(28, 25, 23, 0.04);
   --shadow-lg: 0 8px 25px rgba(28, 25, 23, 0.1), 0 4px 10px rgba(28, 25, 23, 0.05);
   --shadow-xl: 0 16px 40px rgba(28, 25, 23, 0.12), 0 6px 16px rgba(28, 25, 23, 0.06);
-  --shadow-piece-p1: 0 2px 8px rgba(13, 148, 136, 0.3), 0 0 0 1px rgba(13, 148, 136, 0.1);
-  --shadow-piece-p2: 0 2px 8px rgba(234, 88, 12, 0.3), 0 0 0 1px rgba(234, 88, 12, 0.1);
+  --shadow-piece-p1: 0 3px 6px rgba(13, 148, 136, 0.35), 0 6px 12px rgba(0, 0, 0, 0.12), inset 0 -3px 6px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.25);
+  --shadow-piece-p2: 0 3px 6px rgba(234, 88, 12, 0.35), 0 6px 12px rgba(0, 0, 0, 0.12), inset 0 -3px 6px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.25);
 
   --font-sans: 'Manrope', system-ui, -apple-system, sans-serif;
+
+  --color-p1-light: #2dd4bf;
+  --color-p2-light: #fb923c;
+
+  --color-piece-highlight: rgba(255, 255, 255, 0.45);
+
+  --color-path-ring: rgba(251, 191, 36, 0.4);
+
+  --color-lobby-glow-p1: rgba(13, 148, 136, 0.07);
+  --color-lobby-glow-p2: rgba(234, 88, 12, 0.05);
+
+  --color-shimmer: rgba(255, 255, 255, 0.15);
+
+  --color-selection-text: #ffffff;
 
   --transition-fast: 100ms ease;
   --transition-normal: 200ms ease-out;
   --transition-slow: 350ms ease-out;
+}
+
+:root {
+  --shadow-ghost-p1: var(--shadow-piece-p1), 0 4px 16px rgba(13, 148, 136, 0.4);
+  --shadow-ghost-p2: var(--shadow-piece-p2), 0 4px 16px rgba(234, 88, 12, 0.4);
 }
 
 /* ======================== Base Styles ======================== */
@@ -99,9 +123,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 ::selection {
   background: var(--color-accent);
-  color: white;
+  color: var(--color-selection-text);
 }
 
 ::-webkit-scrollbar { width: 6px; }
@@ -124,8 +153,8 @@ body {
 
 .lobby-bg {
   background:
-    radial-gradient(ellipse 80% 60% at 50% 40%, rgba(13, 148, 136, 0.04), transparent),
-    radial-gradient(ellipse 60% 50% at 80% 80%, rgba(234, 88, 12, 0.03), transparent),
+    radial-gradient(ellipse 80% 60% at 50% 40%, var(--color-lobby-glow-p1), transparent),
+    radial-gradient(ellipse 60% 50% at 80% 80%, var(--color-lobby-glow-p2), transparent),
     var(--color-bg);
 }
 
@@ -177,8 +206,9 @@ body {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.15) 50%,
+    var(--color-shimmer) 50%,
     transparent 100%
   );
   animation: shimmer 2.5s ease-in-out infinite;
+  pointer-events: none;
 }

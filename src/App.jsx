@@ -144,15 +144,16 @@ function gameReducer(state, action) {
 
 // ===================== Компоненты =====================
 
-function Cell({ value, isSelected, isStep, isJump, isP1Zone, isP2Zone, isOnPath, isCheckerDark, isPlayerPiece, onClick, onMouseEnter, onMouseLeave, isHidden }) {
+function Cell({ value, isSelected, isStep, isJump, isP1Zone, isP2Zone, isOnPath, isCheckerDark, isPlayerPiece, currentPlayer, onClick, onMouseEnter, onMouseLeave, isHidden }) {
   let bg = isCheckerDark ? 'bg-cell-dark' : 'bg-cell-light';
   let ring = '';
-  if (isOnPath) { bg = 'bg-cell-path'; ring = 'ring-2 ring-amber-400/40 ring-inset'; }
-  if (isStep) bg = 'bg-cell-step';
-  else if (isJump) { bg = isOnPath ? 'bg-cell-path' : 'bg-cell-jump'; if (isOnPath) ring = 'ring-2 ring-amber-400/40 ring-inset'; }
+  const p = currentPlayer === 1 ? 'p1' : 'p2';
+  if (isOnPath) { bg = 'bg-cell-path'; ring = 'ring-2 ring-path-ring ring-inset'; }
+  if (isStep) bg = `bg-cell-step-${p}`;
+  else if (isJump) { bg = isOnPath ? 'bg-cell-path' : `bg-cell-jump-${p}`; if (isOnPath) ring = 'ring-2 ring-path-ring ring-inset'; }
   else if (isP1Zone) bg = isCheckerDark ? 'bg-zone-p1-strong' : 'bg-zone-p1';
   else if (isP2Zone) bg = isCheckerDark ? 'bg-zone-p2-strong' : 'bg-zone-p2';
-  if (isSelected) { ring = 'ring-2 ring-p2/50 ring-inset'; bg += ' bg-cell-selected'; }
+  if (isSelected) { ring = 'ring-2 ring-accent/50 ring-inset'; bg += ' bg-cell-selected'; }
 
   return (
     <div
@@ -163,13 +164,19 @@ function Cell({ value, isSelected, isStep, isJump, isP1Zone, isP2Zone, isOnPath,
       onMouseLeave={onMouseLeave}
     >
       {value === 1 && !isHidden && (
-        <div className={`w-[70%] h-[70%] rounded-full bg-gradient-to-br from-white/30 to-transparent bg-p1 border-2 border-p1-dark shadow-[var(--shadow-piece-p1)] ${isPlayerPiece ? 'transition-transform duration-150 hover:scale-110' : ''}`} />
+        <div
+          className={`w-[70%] h-[70%] rounded-full border-2 border-p1-dark shadow-[var(--shadow-piece-p1)] ${isPlayerPiece ? 'transition-transform duration-150 hover:scale-110' : ''}`}
+          style={{ background: 'radial-gradient(ellipse 60% 50% at 45% 35%, var(--color-piece-highlight), transparent 60%), radial-gradient(ellipse 100% 100% at 50% 50%, var(--color-p1) 0%, var(--color-p1-dark) 100%)' }}
+        />
       )}
       {value === 2 && !isHidden && (
-        <div className={`w-[70%] h-[70%] rounded-full bg-gradient-to-br from-white/30 to-transparent bg-p2 border-2 border-p2-dark shadow-[var(--shadow-piece-p2)] ${isPlayerPiece ? 'transition-transform duration-150 hover:scale-110' : ''}`} />
+        <div
+          className={`w-[70%] h-[70%] rounded-full border-2 border-p2-dark shadow-[var(--shadow-piece-p2)] ${isPlayerPiece ? 'transition-transform duration-150 hover:scale-110' : ''}`}
+          style={{ background: 'radial-gradient(ellipse 60% 50% at 45% 35%, var(--color-piece-highlight), transparent 60%), radial-gradient(ellipse 100% 100% at 50% 50%, var(--color-p2) 0%, var(--color-p2-dark) 100%)' }}
+        />
       )}
       {value === null && (isStep || isJump) && (
-        <div className={`w-[30%] h-[30%] rounded-full ${isStep ? 'bg-success/50' : 'bg-p2/50'}`} />
+        <div className={`w-[30%] h-[30%] rounded-full ${currentPlayer === 1 ? 'bg-p1/50' : 'bg-p2/50'}`} />
       )}
     </div>
   );
@@ -189,9 +196,11 @@ function GhostPiece({ player, row, col, rows, cols }) {
         top: `${row * cellH + offset * cellH}%`,
         width: `${cellW * size / 100}%`,
         height: `${cellH * size / 100}%`,
-        backgroundColor: player === 1 ? 'var(--color-p1)' : 'var(--color-p2)',
+        background: player === 1
+          ? 'radial-gradient(ellipse 60% 50% at 45% 35%, var(--color-piece-highlight), transparent 60%), radial-gradient(ellipse 100% 100% at 50% 50%, var(--color-p1) 0%, var(--color-p1-dark) 100%)'
+          : 'radial-gradient(ellipse 60% 50% at 45% 35%, var(--color-piece-highlight), transparent 60%), radial-gradient(ellipse 100% 100% at 50% 50%, var(--color-p2) 0%, var(--color-p2-dark) 100%)',
         border: `2px solid ${player === 1 ? 'var(--color-p1-dark)' : 'var(--color-p2-dark)'}`,
-        boxShadow: player === 1 ? 'var(--shadow-piece-p1), 0 4px 16px rgba(13,148,136,0.4)' : 'var(--shadow-piece-p2), 0 4px 16px rgba(234,88,12,0.4)',
+        boxShadow: player === 1 ? 'var(--shadow-ghost-p1)' : 'var(--shadow-ghost-p2)',
         opacity: 0.9,
       }}
     />
@@ -265,7 +274,7 @@ function Board({ state, dispatch, isLocked, hiddenCell, onPlayerMove, ghostPiece
   return (
     <div className="relative" ref={boardRef}>
       <div
-        className="grid gap-0 border border-border bg-surface shadow-[var(--shadow-lg)] rounded-[var(--radius-md)] overflow-hidden"
+        className="grid gap-0 border border-border-strong bg-surface rounded-[var(--radius-md)] overflow-hidden"
         style={{
           gridTemplateColumns: `repeat(${board[0].length}, 1fr)`,
         }}
@@ -289,6 +298,7 @@ function Board({ state, dispatch, isLocked, hiddenCell, onPlayerMove, ghostPiece
                 isOnPath={hoveredPath.has(k)}
                 isCheckerDark={(ri + ci) % 2 === 1}
                 isPlayerPiece={isPlayerPiece}
+                currentPlayer={currentPlayer}
                 isHidden={isHidden}
                 onClick={() => handleClick(ri, ci)}
                 onMouseEnter={() => handleMouseEnter(ri, ci)}
@@ -347,7 +357,7 @@ function InfoPanel({ state, isThinking, elapsed }) {
   const difficultyLabel = { easy: 'Лёгкий', medium: 'Средний', hard: 'Сложный' };
 
   return (
-    <div className="w-full max-w-[min(95vw,600px)] lg:w-auto lg:max-w-none flex flex-col gap-2 lg:gap-4 p-3 lg:p-4 bg-surface rounded-[var(--radius-lg)] border border-border shadow-[var(--shadow-md)] lg:min-w-[220px]">
+    <div className="w-full max-w-[min(95vw,600px)] lg:w-auto lg:max-w-none flex flex-col gap-2 lg:gap-4 p-3 lg:p-4 bg-surface-alt rounded-[var(--radius-lg)] border border-border lg:min-w-[220px]">
       {/* Строка статуса: на мобильных горизонтально, на десктопе — вертикально */}
       <div className="flex items-center justify-between gap-3 lg:flex-col lg:items-stretch lg:gap-0">
 
@@ -396,7 +406,7 @@ function InfoPanel({ state, isThinking, elapsed }) {
         {/* Время */}
         <div className="lg:border-t lg:border-border lg:pt-3 lg:mt-4 text-center min-w-0">
           <div className="text-xs lg:text-sm text-text-dim">Время</div>
-          <div className="text-sm lg:text-lg font-mono font-semibold text-text tracking-wider">{formatTime(elapsed)}</div>
+          <div className="text-sm lg:text-lg font-semibold tabular-nums text-text tracking-wider">{formatTime(elapsed)}</div>
         </div>
 
       </div>
@@ -437,11 +447,11 @@ function InfoPanel({ state, isThinking, elapsed }) {
 function ProgressBar({ label, player, current, total }) {
   const pct = total > 0 ? (current / total) * 100 : 0;
   const gradientStyle = player === 1
-    ? { background: 'linear-gradient(90deg, var(--color-p1), #2dd4bf)' }
-    : { background: 'linear-gradient(90deg, var(--color-p2), #fb923c)' };
+    ? { background: 'linear-gradient(90deg, var(--color-p1), var(--color-p1-light))' }
+    : { background: 'linear-gradient(90deg, var(--color-p2), var(--color-p2-light))' };
   return (
     <div className="mb-2">
-      <div className="flex justify-between text-xs mb-0.5">
+      <div className="flex justify-between text-xs text-text-dim mb-0.5">
         <span>{label}</span>
         <span>{current}/{total}</span>
       </div>
@@ -464,7 +474,7 @@ function GameOver({ winner, moveCount, onRematch, onMenu, isVsComputer, elapsed 
 
   return (
     <div className="fixed inset-0 bg-backdrop backdrop-blur-md flex items-center justify-center z-50 game-over-backdrop">
-      <div className="bg-surface border border-border rounded-[var(--radius-xl)] shadow-[var(--shadow-xl)] p-8 max-w-sm w-full mx-4 text-center game-over-modal">
+      <div className="bg-surface border border-border rounded-[var(--radius-xl)] p-8 max-w-sm w-full mx-4 text-center game-over-modal">
         <div className={`w-16 h-16 rounded-full ${iconBg} flex items-center justify-center text-3xl mx-auto mb-4`}>
           {winner === AI_PLAYER ? '🤖' : '🎉'}
         </div>
@@ -486,7 +496,7 @@ function GameOver({ winner, moveCount, onRematch, onMenu, isVsComputer, elapsed 
           </button>
           <button
             onClick={onMenu}
-            className="px-5 py-2.5 bg-surface-alt text-text-dim border border-border rounded-[var(--radius-md)] hover:border-border-strong font-medium cursor-pointer transition-all duration-150 active:scale-95"
+            className="px-5 py-2.5 bg-surface-alt text-text-dim border border-border rounded-[var(--radius-md)] hover:border-border-strong hover:bg-border font-medium cursor-pointer transition-all duration-150 active:scale-95"
           >
             В меню
           </button>
@@ -691,45 +701,43 @@ function Game({ settings, onMenu, playerStats, onStatsUpdate }) {
 
   return (
     <div className="min-h-screen bg-bg p-2 sm:p-4">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
-          <h1 className="text-xl sm:text-2xl font-bold text-text tracking-tight">Уголки</h1>
+      <div className="grid lg:grid-cols-[minmax(0,min(70vh,600px))_auto] grid-cols-1 gap-3 sm:gap-4 max-w-5xl mx-auto items-start justify-center">
+        <div className="lg:col-span-2 flex items-center justify-between flex-wrap gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-accent">Уголки</h1>
           <div className="flex gap-1.5 sm:gap-2 flex-wrap">
             <button
               onClick={handleUndo}
               disabled={state.history.length === 0 || isThinking || !!state.winner || animating.current}
-              className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface border border-border text-text-dim rounded-[var(--radius-sm)] hover:border-border-strong cursor-pointer transition-all duration-150 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-accent-soft text-accent border border-accent/20 rounded-[var(--radius-md)] hover:border-accent/40 cursor-pointer transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {state.freeUndosLeft > 0 ? `Отменить (${state.freeUndosLeft})` : 'Отменить (реклама)'}
             </button>
             <button
               onClick={() => dispatch({ type: 'SURRENDER' })}
               disabled={!!state.winner || isThinking || animating.current}
-              className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-danger-soft text-danger border border-transparent rounded-[var(--radius-sm)] hover:opacity-80 cursor-pointer transition-all duration-150 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-danger-soft text-danger border border-danger/20 rounded-[var(--radius-md)] hover:opacity-80 cursor-pointer transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Сдаться
             </button>
             <button
               onClick={handleBackToMenu}
-              className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface border border-border text-text-dim rounded-[var(--radius-sm)] hover:border-border-strong cursor-pointer transition-all duration-150 active:scale-95"
+              className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-surface border border-border text-text-dim rounded-[var(--radius-md)] hover:border-border-strong cursor-pointer transition-all duration-150 active:scale-95"
             >
               В меню
             </button>
           </div>
         </div>
-        <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 items-center lg:items-start justify-center">
-          <div className="w-full max-w-[min(95vw,600px)] lg:max-w-[min(70vh,600px)]">
-            <Board
-              state={state}
-              dispatch={dispatch}
-              isLocked={isPlayerTurnBlocked || animating.current}
-              hiddenCell={hiddenCell}
-              onPlayerMove={handlePlayerMove}
-              ghostPiece={ghostPiece}
-            />
-          </div>
-          <InfoPanel state={state} isThinking={isThinking} elapsed={elapsed} />
+        <div className="w-full max-w-[min(95vw,600px)]">
+          <Board
+            state={state}
+            dispatch={dispatch}
+            isLocked={isPlayerTurnBlocked || animating.current}
+            hiddenCell={hiddenCell}
+            onPlayerMove={handlePlayerMove}
+            ghostPiece={ghostPiece}
+          />
         </div>
+        <InfoPanel state={state} isThinking={isThinking} elapsed={elapsed} />
       </div>
 
       {state.winner && (
@@ -754,10 +762,11 @@ function BoardPreview({ rows, cols, cornerSize }) {
 
   return (
     <div
-      className="grid gap-px bg-border border border-border-strong rounded-[var(--radius-xs)] overflow-hidden mx-auto"
+      className="grid border border-border-strong rounded-[var(--radius-xs)] overflow-hidden mx-auto"
       style={{
         gridTemplateColumns: `repeat(${cols}, ${cellSize}px)`,
         gridTemplateRows: `repeat(${rows}, ${cellSize}px)`,
+        gap: 0,
       }}
     >
       {Array.from({ length: rows }, (_, r) =>
@@ -767,8 +776,15 @@ function BoardPreview({ rows, cols, cornerSize }) {
           return (
             <div
               key={`${r},${c}`}
-              className={`${isP1 ? 'bg-p1/20' : isP2 ? 'bg-p2/20' : 'bg-surface'}`}
-            />
+              className="bg-surface flex items-center justify-center border-r border-b border-border/50 last:border-r-0"
+            >
+              {(isP1 || isP2) && (
+                <div
+                  className={`rounded-full ${isP1 ? 'bg-p1' : 'bg-p2'}`}
+                  style={{ width: '70%', height: '70%' }}
+                />
+              )}
+            </div>
           );
         }),
       )}
@@ -794,8 +810,8 @@ function Lobby({ onStart, playerStats }) {
 
   return (
     <div className="min-h-screen lobby-bg flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-surface rounded-[var(--radius-2xl)] shadow-[var(--shadow-xl)] border border-border p-6 max-w-md w-full lobby-card">
-        <h1 className="text-3xl font-bold text-center mb-2 tracking-tight bg-gradient-to-r from-p1 to-p2 bg-clip-text text-transparent">Уголки</h1>
+      <div className="bg-surface rounded-[var(--radius-2xl)] border border-border p-6 max-w-md w-full lobby-card">
+        <h1 className="text-3xl font-bold text-center mb-2 tracking-tight text-accent">Уголки</h1>
         <p className="text-center text-text-dim text-sm mb-4">
           Переместите все фишки в противоположный угол раньше соперника
         </p>
@@ -810,11 +826,11 @@ function Lobby({ onStart, playerStats }) {
                   <button
                     key={preset.key}
                     onClick={() => setSettings({ rows: preset.rows, cols: preset.cols, cornerSize: preset.cornerSize })}
-                    className={`flex-1 py-2 px-3 rounded-[var(--radius-sm)] text-sm font-medium transition-all cursor-pointer
-                      ${active ? 'bg-accent text-white shadow-[var(--shadow-sm)]' : 'bg-surface-alt text-text-dim border border-border hover:border-border-strong'}`}
+                    className={`flex-1 py-2 px-3 rounded-[var(--radius-md)] text-sm font-medium transition-all cursor-pointer
+                      ${active ? 'bg-accent text-white' : 'bg-surface-alt text-text-dim border border-border hover:border-border-strong'}`}
                   >
                     <div>{preset.label}</div>
-                    <div className={`text-xs ${active ? 'text-white/60' : 'text-text-muted'}`}>{preset.description}</div>
+                    <div className={`text-xs ${active ? 'text-white/75' : 'text-text-muted'}`}>{preset.description}</div>
                   </button>
                 );
               })}
@@ -828,8 +844,8 @@ function Lobby({ onStart, playerStats }) {
                 <button
                   key={value}
                   onClick={() => setSettings({ difficulty: value })}
-                  className={`flex-1 py-2 px-3 rounded-[var(--radius-sm)] text-sm font-medium transition-all cursor-pointer
-                    ${settings.difficulty === value ? 'bg-accent text-white shadow-[var(--shadow-sm)]' : 'bg-surface-alt text-text-dim border border-border hover:border-border-strong'}`}
+                  className={`flex-1 py-2 px-3 rounded-[var(--radius-md)] text-sm font-medium transition-all cursor-pointer
+                    ${settings.difficulty === value ? 'bg-accent text-white' : 'bg-surface-alt text-text-dim border border-border hover:border-border-strong'}`}
                 >
                   {label}
                 </button>
@@ -873,7 +889,7 @@ function Lobby({ onStart, playerStats }) {
 
           <button
             onClick={() => onStart(settings)}
-            className="btn-shimmer w-full py-3 bg-accent text-white rounded-[var(--radius-lg)] text-lg font-semibold hover:bg-accent-hover shadow-[var(--shadow-md)] transition-all duration-150 active:scale-95 cursor-pointer"
+            className="btn-shimmer w-full py-3 bg-accent text-white rounded-[var(--radius-md)] text-lg font-semibold hover:bg-accent-hover transition-all duration-150 active:scale-95 cursor-pointer"
           >
             Начать игру
           </button>
