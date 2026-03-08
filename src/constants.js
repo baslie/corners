@@ -34,6 +34,7 @@ export const HUMAN_PLAYER = 2;
 export const FREE_UNDO_LIMIT = 2;
 export const AI_MOVE_DELAY = 400;
 export const ANIMATION_STEP_MS = 250;
+export const TRANSITION_DURATION_MS = 200;
 export const AI_DEADLINE_MS = 2000;
 export const PIECE_SIZE_PERCENT = 70;
 

@@ -17,7 +17,7 @@ export function buildMovePath(selectedPiece, targetRow, targetCol, validMoves) {
   const targetKey = `${targetRow},${targetCol}`;
   if (validMoves?.jumpPaths && validMoves.jumpPaths.has(targetKey)) {
     const jumpPath = getJumpPath(validMoves.jumpPaths, targetRow, targetCol);
-    return [[selectedPiece.row, selectedPiece.col], ...jumpPath];
+    return jumpPath;
   }
   return [[selectedPiece.row, selectedPiece.col], [targetRow, targetCol]];
 }

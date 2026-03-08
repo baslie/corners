@@ -2,6 +2,7 @@
 
 .ghost-piece {
   position: absolute;
+  /* duration synced with TRANSITION_DURATION_MS in constants.js */
   transition: left 200ms ease-in-out, top 200ms ease-in-out;
   pointer-events: none;
   z-index: 10;

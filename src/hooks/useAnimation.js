@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef } from 'react';
-import { ANIMATION_STEP_MS } from '../constants';
-import moveSoundUrl from '../assets/move.ogg';
+import { ANIMATION_STEP_MS, TRANSITION_DURATION_MS } from '../constants';
+import moveSoundUrl from '../assets/move.wav';
 
 export function useAnimation() {
   const [ghostPiece, setGhostPiece] = useState(null);
   const [hiddenCell, setHiddenCell] = useState(null);
   const animating = useRef(false);
+  const soundTimerRef = useRef(null);
 
   const soundRef = useRef(null);
   if (!soundRef.current) {
@@ -33,6 +34,7 @@ export function useAnimation() {
     const nextStep = () => {
       step++;
       if (step >= path.length) {
+        clearTimeout(soundTimerRef.current);
         setGhostPiece(null);
         setHiddenCell(null);
         animating.current = false;
@@ -41,7 +43,7 @@ export function useAnimation() {
       }
       const [r, c] = path[step];
       setGhostPiece({ player, row: r, col: c });
-      playMoveSound();
+      soundTimerRef.current = setTimeout(playMoveSound, TRANSITION_DURATION_MS);
       setTimeout(nextStep, ANIMATION_STEP_MS);
     };
 
