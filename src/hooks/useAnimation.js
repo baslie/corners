@@ -20,7 +20,6 @@ export function useAnimation() {
 
   const animate = useCallback((path, player, onDone) => {
     if (path.length < 2) {
-      playMoveSound();
       onDone();
       return;
     }
@@ -33,7 +32,6 @@ export function useAnimation() {
     let step = 0;
     const nextStep = () => {
       step++;
-      playMoveSound();
       if (step >= path.length) {
         setGhostPiece(null);
         setHiddenCell(null);
@@ -43,6 +41,7 @@ export function useAnimation() {
       }
       const [r, c] = path[step];
       setGhostPiece({ player, row: r, col: c });
+      playMoveSound();
       setTimeout(nextStep, ANIMATION_STEP_MS);
     };
 
