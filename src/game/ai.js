@@ -9,6 +9,14 @@ function manhattanToTarget(r, c, rows, cols, player) {
     : r + c;
 }
 
+// === Дисбаланс осей (отклонение от диагонали) ===
+
+function axisImbalance(r, c, rows, cols, player) {
+  const rowDist = player === 1 ? (rows - 1 - r) : r;
+  const colDist = player === 1 ? (cols - 1 - c) : c;
+  return Math.abs(rowDist - colDist);
+}
+
 // === Генерация всех ходов для игрока ===
 
 function getAllMoves(board, zones, player) {
@@ -123,6 +131,16 @@ function evaluate(board, zones, aiPlayer, difficulty, aiMoveCount = 0) {
     }
   }
 
+  let totalImbalance = 0;
+  let maxImbalance = 0;
+  for (const [pr, pc] of aiPieces) {
+    const imb = axisImbalance(pr, pc, rows, cols, aiPlayer);
+    totalImbalance += imb * imb;
+    maxImbalance = Math.max(maxImbalance, imb);
+  }
+  score -= totalImbalance * 0.4 * urgency;
+  score -= maxImbalance * maxImbalance * 0.3 * urgency;
+
   const aiStart = aiPlayer === 1 ? zones.player1 : zones.player2;
   for (const [pr, pc] of aiPieces) {
     if (aiStart.has(`${pr},${pc}`)) {
@@ -151,6 +169,14 @@ function sortMoves(moves, board, zones, player) {
       : (b.fromRow + b.fromCol) - (b.toRow + b.toCol);
 
     if (aProgress !== bProgress) return bProgress - aProgress;
+
+    const rows = board.length;
+    const cols = board[0].length;
+    const aImbDelta = axisImbalance(a.toRow, a.toCol, rows, cols, player)
+                   - axisImbalance(a.fromRow, a.fromCol, rows, cols, player);
+    const bImbDelta = axisImbalance(b.toRow, b.toCol, rows, cols, player)
+                   - axisImbalance(b.fromRow, b.fromCol, rows, cols, player);
+    if (aImbDelta !== bImbDelta) return aImbDelta - bImbDelta;
 
     const aLen = Math.abs(a.toRow - a.fromRow) + Math.abs(a.toCol - a.fromCol);
     const bLen = Math.abs(b.toRow - b.fromRow) + Math.abs(b.toCol - b.fromCol);
